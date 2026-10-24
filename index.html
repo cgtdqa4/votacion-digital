@@ -424,11 +424,24 @@
 
     window.addEventListener('load', () => {
       const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('role') === 'voter') {
+      
+      // Parse parameters directly from URL for instantaneous title rendering
+      const urlRole = urlParams.get('role');
+      const urlPollId = urlParams.get('poll');
+      const urlTitle = urlParams.get('title');
+
+      if (urlRole === 'voter') {
         currentRole = 'voter';
         isVoterOnly = true;
-      } else if (urlParams.get('role') === 'projection') {
+      } else if (urlRole === 'projection') {
         currentRole = 'projection';
+      }
+
+      if (urlPollId) {
+        pollState.id = urlPollId;
+      }
+      if (urlTitle) {
+        pollState.title = decodeURIComponent(urlTitle);
       }
 
       initCharts();
@@ -549,7 +562,8 @@
 
     function updateQR() {
       const baseUrl = window.location.origin + window.location.pathname;
-      const voterUrl = `${baseUrl}?role=voter&poll=${pollState.id}`;
+      const encodedTitle = encodeURIComponent(pollState.title || '');
+      const voterUrl = `${baseUrl}?role=voter&poll=${pollState.id}&title=${encodedTitle}`;
       
       const qrTextElement = document.getElementById('qrUrlText');
       const qrContainer = document.getElementById('qrcode');
