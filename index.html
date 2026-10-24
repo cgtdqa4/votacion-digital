@@ -16,7 +16,7 @@
 </head>
 <body class="min-h-full bg-slate-100 text-slate-800 font-sans flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
 
-  <!-- ENCABEZADO PRINCIPAL -->
+  <!-- ENCABEZADO PRINCIPAL (Se oculta en teléfonos para los Votantes) -->
   <header id="mainHeader" class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center space-x-3">
@@ -27,12 +27,12 @@
         </div>
         <div>
           <h1 class="font-bold text-base text-slate-900 leading-tight">Votación Digital</h1>
-          <p class="text-xs text-slate-500">Asamblea en Tiempo Real</p>
+          <p class="text-xs text-slate-500">Panel de Control de Asamblea</p>
         </div>
       </div>
 
-      <!-- Selector de Modos y Ajustes Supabase -->
-      <div class="flex items-center space-x-2">
+      <!-- Selector de Modos y Ajustes Supabase (Solo visible para el Secretario) -->
+      <div id="secretaryNavControls" class="flex items-center space-x-2">
         <button onclick="toggleConfigModal()" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition flex items-center space-x-1.5">
           <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
@@ -290,9 +290,9 @@
     Votación Digital para Asambleas &copy; 2026
   </footer>
 
-  <!-- SCRIPT PRINCIPAL CON GENERADOR DE QR NATIVO -->
+  <!-- SCRIPT PRINCIPAL -->
   <script>
-    // GENERADOR NATIVO DE CÓDIGO QR SVG
+    // GENERADOR DE CÓDIGO QR
     function createSvgQRCode(text) {
       const encodeUrl = encodeURIComponent(text);
       return `<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeUrl}" alt="QR Code" class="w-[150px] h-[150px] rounded-lg" />`;
@@ -300,6 +300,7 @@
 
     // ESTADO
     let currentRole = 'secretary';
+    let isVoterOnly = false; // Indica si la sesión fue abierta explícitamente mediante QR
     let pollState = {
       id: Date.now().toString(),
       title: 'Aprobación del Acta de la Sesión Anterior',
@@ -318,6 +319,7 @@
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('role') === 'voter') {
         currentRole = 'voter';
+        isVoterOnly = true; // Bloquea totalmente la barra de navegación para los votantes
       }
 
       initChart();
@@ -337,6 +339,18 @@
 
     function setRole(role) {
       currentRole = role;
+
+      // Ocultar cabecera y controles si es un votante que entró por QR
+      const mainHeader = document.getElementById('mainHeader');
+      const secretaryNavControls = document.getElementById('secretaryNavControls');
+
+      if (isVoterOnly) {
+        mainHeader.classList.add('hidden');
+      } else {
+        mainHeader.classList.remove('hidden');
+        secretaryNavControls.classList.remove('hidden');
+      }
+
       document.getElementById('btnRoleSecretary').className = role === 'secretary' 
         ? 'px-3 py-1 rounded-lg text-xs font-semibold transition bg-indigo-600 text-white shadow-sm'
         : 'px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition';
