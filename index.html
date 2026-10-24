@@ -38,7 +38,7 @@
         </div>
       </div>
 
-      <!-- Selector de Modos y Ajustes Supabase (Solo visible para el Secretario) -->
+      <!-- Selector de Modos (Secretario / Proyección / Votante) -->
       <div id="secretaryNavControls" class="flex items-center space-x-2">
         <button onclick="toggleConfigModal()" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition flex items-center space-x-1.5">
           <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -51,6 +51,9 @@
         <div class="bg-slate-200 p-1 rounded-xl flex space-x-1">
           <button id="btnRoleSecretary" onclick="setRole('secretary')" class="px-3 py-1 rounded-lg text-xs font-semibold transition bg-indigo-600 text-white shadow-sm">
             Secretario
+          </button>
+          <button id="btnRoleProjection" onclick="setRole('projection')" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition">
+            Proyección
           </button>
           <button id="btnRoleVoter" onclick="setRole('voter')" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition">
             Votante
@@ -66,7 +69,6 @@
     <!-- VISTA DEL SECRETARIO -->
     <div id="viewSecretary" class="space-y-6 block">
       
-      <!-- Panel Superior: Controles y Código QR -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         <!-- Controles de la Votación -->
@@ -82,9 +84,17 @@
               </div>
             </div>
 
-            <!-- Entrada de la Propuesta -->
-            <label class="block text-xs font-medium text-slate-600 mb-1">Título del Punto / Propuesta</label>
-            <input type="text" id="pollTitleInput" oninput="updatePollTitle(this.value)" placeholder="Escribe aquí el punto a votar (ej: Aprobación de presupuestos)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base font-semibold transition mb-4">
+            <!-- Entrada de Propuesta con Botón de Confirmación -->
+            <label class="block text-xs font-medium text-slate-600 mb-1">Escribe la Propuesta / Punto del Día</label>
+            <div class="flex space-x-2 mb-4">
+              <input type="text" id="pollTitleInput" onkeydown="if(event.key==='Enter') applyPollTitle()" placeholder="Ej: Aprobación de presupuestos anuales" class="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base font-semibold transition">
+              <button onclick="applyPollTitle()" class="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1 shrink-0">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                <span>Fijar Punto y Generar QR</span>
+              </button>
+            </div>
 
             <!-- Contadores de Votos -->
             <div class="grid grid-cols-3 gap-3">
@@ -112,16 +122,16 @@
               <span id="btnTogglePollText">Cerrar Votación</span>
             </button>
 
-            <button onclick="resetPoll()" class="px-4 py-2.5 rounded-xl text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition flex items-center justify-center space-x-2 shadow-sm">
+            <button onclick="resetPoll()" class="px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-800 hover:bg-slate-900 text-white transition flex items-center justify-center space-x-2 shadow-sm">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
               </svg>
-              <span>Nueva Votación / Reiniciar</span>
+              <span>Nueva Votación / Limpiar</span>
             </button>
           </div>
         </div>
 
-        <!-- Tarjeta de Proyección del Código QR -->
+        <!-- Tarjeta de Código QR -->
         <div class="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center shadow-sm">
           <h3 class="text-sm font-bold text-slate-800 mb-1">Escanear para Votar</h3>
           <p class="text-xs text-slate-500 mb-4">Proyecta este código QR en la pantalla de la sede</p>
@@ -153,7 +163,7 @@
         </div>
       </div>
 
-      <!-- Historial de Votaciones de la Sesión + Exportación -->
+      <!-- Historial de Votaciones de la Sesión -->
       <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
           <h2 class="text-base font-bold text-slate-800 flex items-center space-x-2">
@@ -163,7 +173,6 @@
             <span>Historial de Votaciones de la Sesión</span>
           </h2>
 
-          <!-- Botones de Acción e Historial -->
           <div class="flex items-center space-x-2">
             <button onclick="clearHistory()" class="px-3 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition">
               Borrar Historial
@@ -209,10 +218,81 @@
       </div>
     </div>
 
-    <!-- VISTA DEL VOTANTE (Optimizada para móviles tras escanear el QR) -->
+    <!-- VISTA DE PROYECCIÓN (PANTALLA SALA / PROYECTOR) -->
+    <div id="viewProjection" class="hidden space-y-8 py-4">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+        
+        <!-- Título del Punto en Gigante y Estado -->
+        <div class="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-8 sm:p-10 shadow-md flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-6">
+              <span class="text-sm font-bold tracking-widest text-indigo-600 uppercase bg-indigo-50 px-4 py-1.5 rounded-full border border-indigo-100">
+                Punto en Votación
+              </span>
+              <div id="projStatusBadge" class="flex items-center space-x-2 text-sm font-bold px-4 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span id="projStatusText">Votación Abierta</span>
+              </div>
+            </div>
+
+            <h2 id="projPollTitle" class="text-3xl sm:text-5xl font-black text-slate-900 leading-tight tracking-tight mb-8">
+              Esperando propuesta del secretario...
+            </h2>
+          </div>
+
+          <!-- Contadores Gigantes en Pantalla -->
+          <div class="grid grid-cols-3 gap-4">
+            <div class="bg-emerald-50/80 border-2 border-emerald-200 rounded-2xl p-4 text-center">
+              <div class="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-1">SÍ</div>
+              <div id="projCountYes" class="text-4xl sm:text-5xl font-black text-emerald-800">0</div>
+            </div>
+            <div class="bg-rose-50/80 border-2 border-rose-200 rounded-2xl p-4 text-center">
+              <div class="text-xs font-bold text-rose-700 uppercase tracking-wider mb-1">NO</div>
+              <div id="projCountNo" class="text-4xl sm:text-5xl font-black text-rose-800">0</div>
+            </div>
+            <div class="bg-amber-50/80 border-2 border-amber-200 rounded-2xl p-4 text-center">
+              <div class="text-xs font-bold text-amber-700 uppercase tracking-wider mb-1">Abstención</div>
+              <div id="projCountAbs" class="text-4xl sm:text-5xl font-black text-amber-800">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Código QR Gigante para Escanear -->
+        <div class="bg-white border border-slate-200 rounded-3xl p-8 shadow-md flex flex-col items-center justify-center text-center">
+          <h3 class="text-lg font-extrabold text-slate-900 mb-2">Escanea desde tu móvil</h3>
+          <p class="text-xs text-slate-500 mb-6">Apunta con la cámara para votar SÍ, NO o ABSTENCIÓN</p>
+          
+          <div class="bg-white border-4 border-slate-200 p-4 rounded-3xl shadow-lg mb-4 flex items-center justify-center">
+            <div id="projQrcode"></div>
+          </div>
+
+          <p class="text-xs text-slate-400 font-mono">Asamblea en Tiempo Real</p>
+        </div>
+      </div>
+
+      <!-- Gráfico de Resultados Grande para Proyección -->
+      <div class="bg-white border border-slate-200 rounded-3xl p-8 shadow-md">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-xl font-bold text-slate-800 flex items-center space-x-2">
+            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+            <span>Resultados de la Sala</span>
+          </h3>
+          <div class="text-sm font-bold text-slate-600">
+            Total Asistentes Votando: <span id="projTotalVotesCount" class="text-indigo-600 font-black text-lg">0</span>
+          </div>
+        </div>
+
+        <div class="h-80 w-full">
+          <canvas id="projResultsChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- VISTA DEL VOTANTE (MÓVIL) -->
     <div id="viewVoter" class="hidden max-w-md mx-auto space-y-6 py-2">
       
-      <!-- Encabezado Móvil -->
       <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm text-center space-y-2">
         <span class="text-[10px] font-bold tracking-widest text-indigo-600 uppercase bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
           Asamblea Sede
@@ -226,12 +306,10 @@
         </div>
       </div>
 
-      <!-- Estado de Respuesta Emitida -->
       <div id="voterChoiceAlert" class="hidden bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-center text-xs text-indigo-800">
         Has emitido tu voto: <strong id="voterChoiceText" class="uppercase text-indigo-900">---</strong>. Puedes cambiar tu respuesta mientras siga abierta.
       </div>
 
-      <!-- Botones de Voto -->
       <div id="votingButtonsContainer" class="grid grid-cols-1 gap-4">
         <button onclick="castVote('yes')" class="group relative overflow-hidden bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xl py-6 px-6 rounded-2xl shadow-md active:scale-95 transition flex items-center justify-between border border-emerald-500">
           <span class="flex items-center space-x-3">
@@ -264,7 +342,6 @@
         </button>
       </div>
 
-      <!-- Cartel de Votación Cerrada -->
       <div id="voterClosedNotice" class="hidden bg-white border border-slate-200 rounded-2xl p-8 text-center space-y-3 shadow-sm">
         <svg class="w-12 h-12 text-amber-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
@@ -322,13 +399,11 @@
 
   <!-- SCRIPT PRINCIPAL -->
   <script>
-    // GENERADOR DE CÓDIGO QR
-    function createSvgQRCode(text) {
+    function createSvgQRCode(text, size = 150) {
       const encodeUrl = encodeURIComponent(text);
-      return `<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeUrl}" alt="QR Code" class="w-[150px] h-[150px] rounded-lg" />`;
+      return `<img src="https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeUrl}" alt="QR Code" class="rounded-lg" style="width:${size}px; height:${size}px" />`;
     }
 
-    // ESTADO DE LA APLICACIÓN
     let currentRole = 'secretary';
     let isVoterOnly = false;
     let pollState = {
@@ -345,22 +420,24 @@
     let supabaseChannel = null;
     let localBroadcastChannel = null;
     let chartInstance = null;
+    let projChartInstance = null;
 
     window.addEventListener('load', () => {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('role') === 'voter') {
         currentRole = 'voter';
         isVoterOnly = true;
+      } else if (urlParams.get('role') === 'projection') {
+        currentRole = 'projection';
       }
 
-      initChart();
+      initCharts();
       initCommunication();
       setRole(currentRole);
       renderHistory();
       updateQR();
 
-      // Si es un votante, pedir inmediatamente el estado actual al Secretario
-      if (currentRole === 'voter') {
+      if (currentRole === 'voter' || currentRole === 'projection') {
         setTimeout(() => {
           broadcastState({ type: 'REQUEST_STATE' });
         }, 500);
@@ -389,25 +466,22 @@
         secretaryNavControls.classList.remove('hidden');
       }
 
-      document.getElementById('btnRoleSecretary').className = role === 'secretary' 
-        ? 'px-3 py-1 rounded-lg text-xs font-semibold transition bg-indigo-600 text-white shadow-sm'
-        : 'px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition';
+      const activeClass = "px-3 py-1 rounded-lg text-xs font-semibold transition bg-indigo-600 text-white shadow-sm";
+      const inactiveClass = "px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition";
 
-      document.getElementById('btnRoleVoter').className = role === 'voter' 
-        ? 'px-3 py-1 rounded-lg text-xs font-semibold transition bg-indigo-600 text-white shadow-sm'
-        : 'px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition';
+      document.getElementById('btnRoleSecretary').className = role === 'secretary' ? activeClass : inactiveClass;
+      document.getElementById('btnRoleProjection').className = role === 'projection' ? activeClass : inactiveClass;
+      document.getElementById('btnRoleVoter').className = role === 'voter' ? activeClass : inactiveClass;
 
-      if (role === 'secretary') {
-        document.getElementById('viewSecretary').classList.remove('hidden');
-        document.getElementById('viewSecretary').classList.add('block');
-        document.getElementById('viewVoter').classList.add('hidden');
-        document.getElementById('viewVoter').classList.remove('block');
-      } else {
-        document.getElementById('viewSecretary').classList.add('hidden');
-        document.getElementById('viewSecretary').classList.remove('block');
-        document.getElementById('viewVoter').classList.remove('hidden');
-        document.getElementById('viewVoter').classList.add('block');
-      }
+      document.getElementById('viewSecretary').classList.toggle('hidden', role !== 'secretary');
+      document.getElementById('viewSecretary').classList.toggle('block', role === 'secretary');
+
+      document.getElementById('viewProjection').classList.toggle('hidden', role !== 'projection');
+      document.getElementById('viewProjection').classList.toggle('block', role === 'projection');
+
+      document.getElementById('viewVoter').classList.toggle('hidden', role !== 'voter');
+      document.getElementById('viewVoter').classList.toggle('block', role === 'voter');
+
       updateUI();
     }
 
@@ -455,7 +529,6 @@
         updateUI();
         updateQR();
       } else if (msg.type === 'REQUEST_STATE') {
-        // Un votante acaba de conectarse y pide el título y estado actual
         if (currentRole === 'secretary') {
           broadcastState({ type: 'SYNC_STATE', state: pollState });
         }
@@ -480,12 +553,14 @@
       
       const qrTextElement = document.getElementById('qrUrlText');
       const qrContainer = document.getElementById('qrcode');
+      const projQrContainer = document.getElementById('projQrcode');
 
       if (qrTextElement) qrTextElement.innerText = voterUrl;
-      if (qrContainer) qrContainer.innerHTML = createSvgQRCode(voterUrl);
+      if (qrContainer) qrContainer.innerHTML = createSvgQRCode(voterUrl, 150);
+      if (projQrContainer) projQrContainer.innerHTML = createSvgQRCode(voterUrl, 230);
     }
 
-    function initChart() {
+    function initCharts() {
       const ctx = document.getElementById('resultsChart').getContext('2d');
       chartInstance = new Chart(ctx, {
         type: 'bar',
@@ -500,19 +575,32 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false }
-          },
+          plugins: { legend: { display: false } },
           scales: {
-            y: {
-              beginAtZero: true,
-              ticks: { precision: 0, color: '#64748b' },
-              grid: { color: '#e2e8f0' }
-            },
-            x: {
-              ticks: { color: '#334155', font: { weight: 'bold' } },
-              grid: { display: false }
-            }
+            y: { beginAtZero: true, ticks: { precision: 0, color: '#64748b' }, grid: { color: '#e2e8f0' } },
+            x: { ticks: { color: '#334155', font: { weight: 'bold' } }, grid: { display: false } }
+          }
+        }
+      });
+
+      const projCtx = document.getElementById('projResultsChart').getContext('2d');
+      projChartInstance = new Chart(projCtx, {
+        type: 'bar',
+        data: {
+          labels: ['SÍ', 'NO', 'ABSTENCIÓN'],
+          datasets: [{
+            data: [0, 0, 0],
+            backgroundColor: ['#059669', '#e11d48', '#d97706'],
+            borderRadius: 12
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { precision: 0, color: '#64748b', font: { size: 14 } }, grid: { color: '#e2e8f0' } },
+            x: { ticks: { color: '#1e293b', font: { size: 16, weight: 'bold' } }, grid: { display: false } }
           }
         }
       });
@@ -553,7 +641,29 @@
         chartInstance.update();
       }
 
-      // Actualizar el título del punto en el móvil
+      // VISTA PROYECCIÓN
+      document.getElementById('projPollTitle').innerText = pollState.title.trim() !== '' ? pollState.title : 'Esperando propuesta...';
+      document.getElementById('projCountYes').innerText = counts.yes;
+      document.getElementById('projCountNo').innerText = counts.no;
+      document.getElementById('projCountAbs').innerText = counts.abstain;
+      document.getElementById('projTotalVotesCount').innerText = total;
+
+      const projStatusBadge = document.getElementById('projStatusBadge');
+      const projStatusText = document.getElementById('projStatusText');
+      if (pollState.isOpen) {
+        projStatusBadge.className = "flex items-center space-x-2 text-sm font-bold px-4 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200";
+        projStatusText.innerText = "Votación Abierta";
+      } else {
+        projStatusBadge.className = "flex items-center space-x-2 text-sm font-bold px-4 py-1.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200";
+        projStatusText.innerText = "Votación Cerrada";
+      }
+
+      if (projChartInstance) {
+        projChartInstance.data.datasets[0].data = [counts.yes, counts.no, counts.abstain];
+        projChartInstance.update();
+      }
+
+      // VISTA VOTANTE
       const voterTitleElement = document.getElementById('voterPollTitle');
       if (voterTitleElement) {
         voterTitleElement.innerText = pollState.title.trim() !== '' ? pollState.title : 'Esperando punto a votar...';
@@ -602,8 +712,15 @@
       });
     }
 
-    function updatePollTitle(val) {
-      pollState.title = val;
+    function applyPollTitle() {
+      const inputVal = document.getElementById('pollTitleInput').value.trim();
+      pollState.title = inputVal;
+      pollState.id = Date.now().toString();
+      pollState.votes = {};
+      pollState.isOpen = true;
+
+      updateUI();
+      updateQR();
       broadcastState({ type: 'SYNC_STATE', state: pollState });
     }
 
@@ -688,7 +805,6 @@
       }
     }
 
-    // EXPORTACIÓN A EXCEL (XLSX)
     function exportToExcel() {
       if (historyLogs.length === 0) {
         alert("No hay registros en el historial para exportar.");
@@ -712,7 +828,6 @@
       XLSX.writeFile(workbook, `Votaciones_Asamblea_${dateStr}.xlsx`);
     }
 
-    // EXPORTACIÓN A PDF
     function exportToPDF() {
       if (historyLogs.length === 0) {
         alert("No hay registros en el historial para exportar.");
