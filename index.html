@@ -84,7 +84,7 @@
 
             <!-- Entrada de la Propuesta -->
             <label class="block text-xs font-medium text-slate-600 mb-1">Título del Punto / Propuesta</label>
-            <input type="text" id="pollTitleInput" oninput="updatePollTitle(this.value)" placeholder="Ej: Aprobación del acta de la reunión anterior" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base font-semibold transition mb-4">
+            <input type="text" id="pollTitleInput" oninput="updatePollTitle(this.value)" placeholder="Escribe aquí el punto a votar (ej: Aprobación de presupuestos)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base font-semibold transition mb-4">
 
             <!-- Contadores de Votos -->
             <div class="grid grid-cols-3 gap-3">
@@ -218,7 +218,7 @@
           Asamblea Sede
         </span>
         <h2 id="voterPollTitle" class="text-base font-bold text-slate-900 leading-snug">
-          Cargando punto a votar...
+          Esperando punto a votar...
         </h2>
         <div id="voterStatusBadge" class="inline-flex items-center space-x-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
           <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -333,7 +333,7 @@
     let isVoterOnly = false;
     let pollState = {
       id: Date.now().toString(),
-      title: 'Aprobación del Acta de la Sesión Anterior',
+      title: '', // Casilla inicial limpia
       isOpen: true,
       votes: {}
     };
@@ -584,7 +584,8 @@
     }
 
     function updatePollTitle(val) {
-      pollState.title = val || 'Punto de la Asamblea';
+      pollState.title = val || '';
+      updateQR(); // Re-genera el QR al vuelo si se escribe un título
       broadcastState({ type: 'SYNC_STATE', state: pollState });
     }
 
@@ -612,25 +613,22 @@
           total: total
         });
 
-        // Guardar en almacenamiento permanente del navegador
         localStorage.setItem('asamblea_history_logs', JSON.stringify(historyLogs));
         renderHistory();
 
-        // Transmitir historial a otros dispositivos
         broadcastState({ type: 'SYNC_HISTORY', history: historyLogs });
       }
 
-      // Reiniciar estado
       pollState = {
         id: Date.now().toString(),
-        title: '',
+        title: '', // Limpia la casilla para la siguiente propuesta
         isOpen: true,
         votes: {}
       };
 
       document.getElementById('pollTitleInput').value = '';
       updateUI();
-      updateQR();
+      updateQR(); // Genera un QR totalmente nuevo para el siguiente punto
       broadcastState({ type: 'SYNC_STATE', state: pollState });
     }
 
