@@ -13,6 +13,13 @@
 
   <!-- Supabase JS Client para sincronización 4G/5G en tiempo real -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- SheetJS para Exportación a Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- jsPDF y autoTable para Exportación a PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body class="min-h-full bg-slate-100 text-slate-800 font-sans flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
 
@@ -146,17 +153,36 @@
         </div>
       </div>
 
-      <!-- Historial de Votaciones de la Sesión -->
+      <!-- Historial de Votaciones de la Sesión + Exportación -->
       <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <h2 class="text-base font-bold text-slate-800 mb-4 flex items-center space-x-2">
-          <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          <span>Historial de Votaciones de la Sesión</span>
-        </h2>
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <h2 class="text-base font-bold text-slate-800 flex items-center space-x-2">
+            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span>Historial de Votaciones de la Sesión</span>
+          </h2>
+
+          <!-- Botones de Exportación -->
+          <div class="flex items-center space-x-2">
+            <button onclick="exportToExcel()" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition flex items-center space-x-1.5 shadow-sm">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              <span>Exportar Excel</span>
+            </button>
+
+            <button onclick="exportToPDF()" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition flex items-center space-x-1.5 shadow-sm">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+              </svg>
+              <span>Exportar PDF</span>
+            </button>
+          </div>
+        </div>
 
         <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs text-slate-700">
+          <table id="historyTable" class="w-full text-left text-xs text-slate-700">
             <thead class="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-200">
               <tr>
                 <th class="px-4 py-3">Hora</th>
@@ -300,7 +326,7 @@
 
     // ESTADO
     let currentRole = 'secretary';
-    let isVoterOnly = false; // Indica si la sesión fue abierta explícitamente mediante QR
+    let isVoterOnly = false;
     let pollState = {
       id: Date.now().toString(),
       title: 'Aprobación del Acta de la Sesión Anterior',
@@ -319,7 +345,7 @@
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('role') === 'voter') {
         currentRole = 'voter';
-        isVoterOnly = true; // Bloquea totalmente la barra de navegación para los votantes
+        isVoterOnly = true;
       }
 
       initChart();
@@ -340,7 +366,6 @@
     function setRole(role) {
       currentRole = role;
 
-      // Ocultar cabecera y controles si es un votante que entró por QR
       const mainHeader = document.getElementById('mainHeader');
       const secretaryNavControls = document.getElementById('secretaryNavControls');
 
@@ -611,6 +636,86 @@
         `;
         tbody.appendChild(tr);
       });
+    }
+
+    // EXPORTACIÓN A EXCEL (XLSX)
+    function exportToExcel() {
+      if (historyLogs.length === 0) {
+        alert("No hay registros en el historial para exportar.");
+        return;
+      }
+
+      const excelData = historyLogs.map(item => ({
+        'Hora': item.time,
+        'Punto Votado': item.title || 'Sin título',
+        'Votos SÍ': item.yes,
+        'Votos NO': item.no,
+        'Abstenciones': item.abstain,
+        'Total Votos': item.total
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Votaciones_Asamblea");
+
+      // Descargar archivo Excel
+      const dateStr = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(workbook, `Votaciones_Asamblea_${dateStr}.xlsx`);
+    }
+
+    // EXPORTACIÓN A PDF
+    function exportToPDF() {
+      if (historyLogs.length === 0) {
+        alert("No hay registros en el historial para exportar.");
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      const dateStr = new Date().toLocaleDateString();
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      // Encabezado del documento PDF
+      doc.setFontSize(18);
+      doc.setFont("helvetica", "bold");
+      doc.text("Acta Resumen de Votaciones", 14, 20);
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100);
+      doc.text(`Fecha: ${dateStr} - Hora: ${timeStr}`, 14, 28);
+      doc.text("Sistema Digital de Asamblea", 14, 34);
+
+      // Mapear datos del historial para la tabla
+      const tableRows = historyLogs.map(item => [
+        item.time,
+        item.title || 'Sin título',
+        item.yes,
+        item.no,
+        item.abstain,
+        item.total
+      ]);
+
+      // Estilo e inserción de la tabla en el PDF
+      doc.autoTable({
+        startY: 40,
+        head: [['Hora', 'Punto Votado', 'SÍ', 'NO', 'Abstención', 'Total']],
+        body: tableRows,
+        theme: 'striped',
+        headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
+        columnStyles: {
+          0: { cellWidth: 25 },
+          1: { cellWidth: 'auto' },
+          2: { halign: 'center', fontStyle: 'bold' },
+          3: { halign: 'center', fontStyle: 'bold' },
+          4: { halign: 'center', fontStyle: 'bold' },
+          5: { halign: 'center', fontStyle: 'bold' }
+        }
+      });
+
+      // Descargar archivo PDF
+      doc.save(`Acta_Votaciones_Asamblea_${dateStr.replace(/\//g, '-')}.pdf`);
     }
 
     function toggleConfigModal() {
