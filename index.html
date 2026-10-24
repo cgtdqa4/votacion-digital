@@ -333,12 +333,11 @@
     let isVoterOnly = false;
     let pollState = {
       id: Date.now().toString(),
-      title: '', // Casilla inicial limpia
+      title: '',
       isOpen: true,
       votes: {}
     };
 
-    // Cargar historial de localStorage
     let historyLogs = JSON.parse(localStorage.getItem('asamblea_history_logs') || '[]');
     let voterId = getOrCreateVoterId();
 
@@ -357,8 +356,15 @@
       initChart();
       initCommunication();
       setRole(currentRole);
-      renderHistory(); // Cargar tabla guardada
+      renderHistory();
       updateQR();
+
+      // Si es un votante, pedir inmediatamente el estado actual al Secretario
+      if (currentRole === 'voter') {
+        setTimeout(() => {
+          broadcastState({ type: 'REQUEST_STATE' });
+        }, 500);
+      }
     });
 
     function getOrCreateVoterId() {
@@ -448,6 +454,11 @@
         pollState = msg.state;
         updateUI();
         updateQR();
+      } else if (msg.type === 'REQUEST_STATE') {
+        // Un votante acaba de conectarse y pide el título y estado actual
+        if (currentRole === 'secretary') {
+          broadcastState({ type: 'SYNC_STATE', state: pollState });
+        }
       } else if (msg.type === 'CAST_VOTE') {
         if (pollState.isOpen && msg.pollId === pollState.id) {
           pollState.votes[msg.voterId] = msg.choice;
@@ -514,7 +525,10 @@
       });
       const total = counts.yes + counts.no + counts.abstain;
 
-      document.getElementById('pollTitleInput').value = pollState.title;
+      if (document.activeElement !== document.getElementById('pollTitleInput')) {
+        document.getElementById('pollTitleInput').value = pollState.title;
+      }
+
       document.getElementById('countYes').innerText = counts.yes;
       document.getElementById('countNo').innerText = counts.no;
       document.getElementById('countAbs').innerText = counts.abstain;
@@ -539,7 +553,12 @@
         chartInstance.update();
       }
 
-      document.getElementById('voterPollTitle').innerText = pollState.title || 'Propuesta en Asamblea';
+      // Actualizar el título del punto en el móvil
+      const voterTitleElement = document.getElementById('voterPollTitle');
+      if (voterTitleElement) {
+        voterTitleElement.innerText = pollState.title.trim() !== '' ? pollState.title : 'Esperando punto a votar...';
+      }
+
       const voterStatusBadge = document.getElementById('voterStatusBadge');
       const voterStatusText = document.getElementById('voterStatusText');
       const btnContainer = document.getElementById('votingButtonsContainer');
@@ -584,8 +603,7 @@
     }
 
     function updatePollTitle(val) {
-      pollState.title = val || '';
-      updateQR(); // Re-genera el QR al vuelo si se escribe un título
+      pollState.title = val;
       broadcastState({ type: 'SYNC_STATE', state: pollState });
     }
 
@@ -621,14 +639,14 @@
 
       pollState = {
         id: Date.now().toString(),
-        title: '', // Limpia la casilla para la siguiente propuesta
+        title: '',
         isOpen: true,
         votes: {}
       };
 
       document.getElementById('pollTitleInput').value = '';
       updateUI();
-      updateQR(); // Genera un QR totalmente nuevo para el siguiente punto
+      updateQR();
       broadcastState({ type: 'SYNC_STATE', state: pollState });
     }
 
