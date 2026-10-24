@@ -425,7 +425,6 @@
     window.addEventListener('load', () => {
       const urlParams = new URLSearchParams(window.location.search);
       
-      // Parse parameters directly from URL for instantaneous title rendering
       const urlRole = urlParams.get('role');
       const urlPollId = urlParams.get('poll');
       const urlTitle = urlParams.get('title');
@@ -718,6 +717,7 @@
       pollState.votes[voterId] = choice;
       updateUI();
 
+      // Transmitir inmediatamente al secretario y proyector
       broadcastState({
         type: 'CAST_VOTE',
         pollId: pollState.id,
@@ -751,6 +751,7 @@
       });
       const total = counts.yes + counts.no + counts.abstain;
 
+      // Guardar en el historial si hubo votos o título
       if (total > 0 || pollState.title.trim() !== '') {
         const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         historyLogs.unshift({
@@ -768,6 +769,7 @@
         broadcastState({ type: 'SYNC_HISTORY', history: historyLogs });
       }
 
+      // Reiniciar estado para la siguiente votación
       pollState = {
         id: Date.now().toString(),
         title: '',
