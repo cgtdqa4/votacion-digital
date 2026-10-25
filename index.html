@@ -1,898 +1,531 @@
+
 <!DOCTYPE html>
-<html lang="es" class="h-full bg-slate-100">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Votación Digital - Asamblea</title>
-
-  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Chart.js para gráficos de resultados -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- Supabase JS Client para sincronización 4G/5G en tiempo real -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- SheetJS para Exportación a Excel -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
-  <!-- jsPDF y autoTable para Exportación a PDF -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+  </style>
 </head>
-<body class="min-h-full bg-slate-100 text-slate-800 font-sans flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+<body class="min-h-screen bg-slate-100 text-slate-800">
 
-  <!-- ENCABEZADO PRINCIPAL (Se oculta en teléfonos para los Votantes) -->
-  <header id="mainHeader" class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
-          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-        </div>
-        <div>
-          <h1 class="font-bold text-base text-slate-900 leading-tight">Votación Digital</h1>
-          <p class="text-xs text-slate-500">Panel de Control de Asamblea</p>
-        </div>
-      </div>
+<header id="header" class="bg-white border-b p-4">
+  <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
+    <h1 class="font-bold text-xl">Votación Digital</h1>
+    <nav id="nav" class="flex flex-wrap gap-2">
+      <button onclick="setRole('secretary')" class="rounded-lg bg-indigo-600 text-white px-3 py-2">Secretario</button>
+      <button onclick="setRole('projection')" class="rounded-lg bg-slate-200 px-3 py-2">Proyección</button>
+      <button onclick="setRole('voter')" class="rounded-lg bg-slate-200 px-3 py-2">Votante</button>
+    </nav>
+  </div>
+</header>
 
-      <!-- Selector de Modos (Secretario / Proyección / Votante) -->
-      <div id="secretaryNavControls" class="flex items-center space-x-2">
-        <button onclick="toggleConfigModal()" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 transition flex items-center space-x-1.5">
-          <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-          </svg>
-          <span class="hidden sm:inline">Supabase</span>
-        </button>
+<main class="max-w-6xl mx-auto p-4 space-y-5">
 
-        <div class="bg-slate-200 p-1 rounded-xl flex space-x-1">
-          <button id="btnRoleSecretary" onclick="setRole('secretary')" class="px-3 py-1 rounded-lg text-xs font-semibold transition bg-indigo-600 text-white shadow-sm">
-            Secretario
-          </button>
-          <button id="btnRoleProjection" onclick="setRole('projection')" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition">
-            Proyección
-          </button>
-          <button id="btnRoleVoter" onclick="setRole('voter')" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition">
-            Votante
-          </button>
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <!-- CONTENIDO PRINCIPAL -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
-
-    <!-- VISTA DEL SECRETARIO -->
-    <div id="viewSecretary" class="space-y-6 block">
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <!-- Controles de la Votación -->
-        <div class="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between shadow-sm">
-          <div>
-            <div class="flex items-center justify-between mb-4">
-              <span class="text-xs font-bold tracking-wider text-indigo-600 uppercase bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
-                Punto Actual a Votar
-              </span>
-              <div id="statusBadge" class="flex items-center space-x-2 text-xs font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span id="statusText">Votación Abierta</span>
-              </div>
-            </div>
-
-            <!-- Entrada de Propuesta con Botón de Confirmación -->
-            <label class="block text-xs font-medium text-slate-600 mb-1">Escribe la Propuesta / Punto del Día</label>
-            <div class="flex space-x-2 mb-4">
-              <input type="text" id="pollTitleInput" onkeydown="if(event.key==='Enter') applyPollTitle()" placeholder="Ej: Aprobación de presupuestos anuales" class="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-base font-semibold transition">
-              <button onclick="applyPollTitle()" class="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center space-x-1 shrink-0">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                <span>Fijar Punto y Generar QR</span>
-              </button>
-            </div>
-
-            <!-- Contadores de Votos -->
-            <div class="grid grid-cols-3 gap-3">
-              <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
-                <div class="text-xs font-medium text-emerald-700 uppercase tracking-wider mb-1">SÍ</div>
-                <div id="countYes" class="text-2xl font-extrabold text-emerald-800">0</div>
-              </div>
-              <div class="bg-rose-50 border border-rose-200 rounded-xl p-3 text-center">
-                <div class="text-xs font-medium text-rose-700 uppercase tracking-wider mb-1">NO</div>
-                <div id="countNo" class="text-2xl font-extrabold text-rose-800">0</div>
-              </div>
-              <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
-                <div class="text-xs font-medium text-amber-700 uppercase tracking-wider mb-1">Abstención</div>
-                <div id="countAbs" class="text-2xl font-extrabold text-amber-800">0</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Botones de Acción -->
-          <div class="mt-6 pt-4 border-t border-slate-100 flex flex-wrap gap-3">
-            <button id="btnTogglePoll" onclick="togglePollStatus()" class="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold bg-amber-500 hover:bg-amber-600 text-white transition flex items-center justify-center space-x-2 shadow-sm">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
-              <span id="btnTogglePollText">Cerrar Votación</span>
-            </button>
-
-            <button onclick="resetPoll()" class="px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-800 hover:bg-slate-900 text-white transition flex items-center justify-center space-x-2 shadow-sm">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-              </svg>
-              <span>Nueva Votación / Limpiar</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Tarjeta de Código QR -->
-        <div class="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center shadow-sm">
-          <h3 class="text-sm font-bold text-slate-800 mb-1">Escanear para Votar</h3>
-          <p class="text-xs text-slate-500 mb-4">Proyecta este código QR en la pantalla de la sede</p>
-          
-          <div class="bg-white border-2 border-slate-200 p-3 rounded-2xl shadow-inner mb-3 flex items-center justify-center min-w-[160px] min-h-[160px]">
-            <div id="qrcode"></div>
-          </div>
-
-          <div class="text-[10px] text-slate-400 truncate max-w-full px-2" id="qrUrlText">...</div>
-        </div>
-      </div>
-
-      <!-- Gráfico de Resultados en Vivo -->
-      <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-base font-bold text-slate-800 flex items-center space-x-2">
-            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-            </svg>
-            <span>Resultados en Tiempo Real</span>
-          </h2>
-          <div class="text-xs font-semibold text-slate-500">
-            Total Votos: <span id="totalVotesCount" class="text-slate-900 font-bold">0</span>
-          </div>
-        </div>
-
-        <div class="h-64 sm:h-72 w-full">
-          <canvas id="resultsChart"></canvas>
-        </div>
-      </div>
-
-      <!-- Historial de Votaciones de la Sesión -->
-      <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-          <h2 class="text-base font-bold text-slate-800 flex items-center space-x-2">
-            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            <span>Historial de Votaciones de la Sesión</span>
-          </h2>
-
-          <div class="flex items-center space-x-2">
-            <button onclick="clearHistory()" class="px-3 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 transition">
-              Borrar Historial
-            </button>
-
-            <button onclick="exportToExcel()" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition flex items-center space-x-1.5 shadow-sm">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-              </svg>
-              <span>Exportar Excel</span>
-            </button>
-
-            <button onclick="exportToPDF()" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition flex items-center space-x-1.5 shadow-sm">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-              </svg>
-              <span>Exportar PDF</span>
-            </button>
-          </div>
-        </div>
-
-        <div class="overflow-x-auto">
-          <table id="historyTable" class="w-full text-left text-xs text-slate-700">
-            <thead class="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-200">
-              <tr>
-                <th class="px-4 py-3">Hora</th>
-                <th class="px-4 py-3">Punto Votado</th>
-                <th class="px-4 py-3 text-center text-emerald-700">SÍ</th>
-                <th class="px-4 py-3 text-center text-rose-700">NO</th>
-                <th class="px-4 py-3 text-center text-amber-700">ABSTENCIÓN</th>
-                <th class="px-4 py-3 text-center">TOTAL</th>
-              </tr>
-            </thead>
-            <tbody id="historyTableBody" class="divide-y divide-slate-100">
-              <tr>
-                <td colspan="6" class="px-4 py-6 text-center text-slate-400 italic">
-                  Aún no se ha guardado ninguna votación en esta sesión.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- VISTA DE PROYECCIÓN (PANTALLA SALA / PROYECTOR) -->
-    <div id="viewProjection" class="hidden space-y-8 py-4">
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
-        
-        <!-- Título del Punto en Gigante y Estado -->
-        <div class="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-8 sm:p-10 shadow-md flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between mb-6">
-              <span class="text-sm font-bold tracking-widest text-indigo-600 uppercase bg-indigo-50 px-4 py-1.5 rounded-full border border-indigo-100">
-                Punto en Votación
-              </span>
-              <div id="projStatusBadge" class="flex items-center space-x-2 text-sm font-bold px-4 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <span class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span id="projStatusText">Votación Abierta</span>
-              </div>
-            </div>
-
-            <h2 id="projPollTitle" class="text-3xl sm:text-5xl font-black text-slate-900 leading-tight tracking-tight mb-8">
-              Esperando propuesta del secretario...
-            </h2>
-          </div>
-
-          <!-- Contadores Gigantes en Pantalla -->
-          <div class="grid grid-cols-3 gap-4">
-            <div class="bg-emerald-50/80 border-2 border-emerald-200 rounded-2xl p-4 text-center">
-              <div class="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-1">SÍ</div>
-              <div id="projCountYes" class="text-4xl sm:text-5xl font-black text-emerald-800">0</div>
-            </div>
-            <div class="bg-rose-50/80 border-2 border-rose-200 rounded-2xl p-4 text-center">
-              <div class="text-xs font-bold text-rose-700 uppercase tracking-wider mb-1">NO</div>
-              <div id="projCountNo" class="text-4xl sm:text-5xl font-black text-rose-800">0</div>
-            </div>
-            <div class="bg-amber-50/80 border-2 border-amber-200 rounded-2xl p-4 text-center">
-              <div class="text-xs font-bold text-amber-700 uppercase tracking-wider mb-1">Abstención</div>
-              <div id="projCountAbs" class="text-4xl sm:text-5xl font-black text-amber-800">0</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Código QR Gigante para Escanear -->
-        <div class="bg-white border border-slate-200 rounded-3xl p-8 shadow-md flex flex-col items-center justify-center text-center">
-          <h3 class="text-lg font-extrabold text-slate-900 mb-2">Escanea desde tu móvil</h3>
-          <p class="text-xs text-slate-500 mb-6">Apunta con la cámara para votar SÍ, NO o ABSTENCIÓN</p>
-          
-          <div class="bg-white border-4 border-slate-200 p-4 rounded-3xl shadow-lg mb-4 flex items-center justify-center">
-            <div id="projQrcode"></div>
-          </div>
-
-          <p class="text-xs text-slate-400 font-mono">Asamblea en Tiempo Real</p>
-        </div>
-      </div>
-
-      <!-- Gráfico de Resultados Grande para Proyección -->
-      <div class="bg-white border border-slate-200 rounded-3xl p-8 shadow-md">
-        <div class="flex items-center justify-between mb-6">
-          <h3 class="text-xl font-bold text-slate-800 flex items-center space-x-2">
-            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-            </svg>
-            <span>Resultados de la Sala</span>
-          </h3>
-          <div class="text-sm font-bold text-slate-600">
-            Total Asistentes Votando: <span id="projTotalVotesCount" class="text-indigo-600 font-black text-lg">0</span>
-          </div>
-        </div>
-
-        <div class="h-80 w-full">
-          <canvas id="projResultsChart"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <!-- VISTA DEL VOTANTE (MÓVIL) -->
-    <div id="viewVoter" class="hidden max-w-md mx-auto space-y-6 py-2">
-      
-      <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm text-center space-y-2">
-        <span class="text-[10px] font-bold tracking-widest text-indigo-600 uppercase bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
-          Asamblea Sede
-        </span>
-        <h2 id="voterPollTitle" class="text-base font-bold text-slate-900 leading-snug">
-          Esperando punto a votar...
-        </h2>
-        <div id="voterStatusBadge" class="inline-flex items-center space-x-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span id="voterStatusText">Votación Abierta</span>
-        </div>
-      </div>
-
-      <div id="voterChoiceAlert" class="hidden bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-center text-xs text-indigo-800">
-        Has emitido tu voto: <strong id="voterChoiceText" class="uppercase text-indigo-900">---</strong>. Puedes cambiar tu respuesta mientras siga abierta.
-      </div>
-
-      <div id="votingButtonsContainer" class="grid grid-cols-1 gap-4">
-        <button onclick="castVote('yes')" class="group relative overflow-hidden bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xl py-6 px-6 rounded-2xl shadow-md active:scale-95 transition flex items-center justify-between border border-emerald-500">
-          <span class="flex items-center space-x-3">
-            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span>SÍ</span>
-          </span>
-          <span class="text-xs bg-emerald-700/60 px-3 py-1 rounded-full font-normal">A favor</span>
-        </button>
-
-        <button onclick="castVote('no')" class="group relative overflow-hidden bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xl py-6 px-6 rounded-2xl shadow-md active:scale-95 transition flex items-center justify-between border border-rose-500">
-          <span class="flex items-center space-x-3">
-            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-            <span>NO</span>
-          </span>
-          <span class="text-xs bg-rose-700/60 px-3 py-1 rounded-full font-normal">En contra</span>
-        </button>
-
-        <button onclick="castVote('abstain')" class="group relative overflow-hidden bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xl py-6 px-6 rounded-2xl shadow-md active:scale-95 transition flex items-center justify-between border border-amber-500">
-          <span class="flex items-center space-x-3">
-            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"></path>
-            </svg>
-            <span>ABSTENCIÓN</span>
-          </span>
-          <span class="text-xs bg-amber-700/60 px-3 py-1 rounded-full font-normal">Sin voto</span>
-        </button>
-      </div>
-
-      <div id="voterClosedNotice" class="hidden bg-white border border-slate-200 rounded-2xl p-8 text-center space-y-3 shadow-sm">
-        <svg class="w-12 h-12 text-amber-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-        </svg>
-        <h3 class="text-lg font-bold text-slate-800">Votación Cerrada</h3>
-        <p class="text-xs text-slate-500">El Secretario ha cerrado este punto o está preparando la siguiente propuesta.</p>
-      </div>
-    </div>
-  </main>
-
-  <!-- MODAL CONFIGURACIÓN SUPABASE -->
-  <div id="configModal" class="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
-      <div class="flex items-center justify-between">
-        <h3 class="text-base font-bold text-slate-800 flex items-center space-x-2">
-          <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-          </svg>
-          <span>Conexión Supabase (Tiempo Real)</span>
-        </h3>
-        <button onclick="toggleConfigModal()" class="text-slate-400 hover:text-slate-700">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
-        </button>
-      </div>
-
-      <p class="text-xs text-slate-600">
-        Introduce tus credenciales de Supabase para conectar teléfonos móviles en redes 4G/5G en tiempo real:
-      </p>
-
-      <div class="space-y-3">
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Supabase URL</label>
-          <input type="text" id="supabaseUrlInput" placeholder="https://xyzcompany.supabase.co" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-slate-600 mb-1">Supabase Anon Key</label>
-          <input type="password" id="supabaseKeyInput" placeholder="sb_publishable_..." class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        </div>
-      </div>
-
-      <div class="pt-2 flex justify-end space-x-2">
-        <button onclick="saveSupabaseConfig()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm">
-          Guardar y Conectar
-        </button>
-      </div>
-    </div>
+  <div id="connection" class="rounded-lg bg-amber-100 text-amber-900 p-3 text-sm">
+    Conectando con Supabase...
   </div>
 
-  <!-- PIE DE PÁGINA -->
-  <footer class="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-500">
-    Votación Digital para Asambleas &copy; 2026
-  </footer>
+  <section id="secretary" class="space-y-5">
+    <div class="bg-white rounded-2xl shadow-sm p-5 space-y-4">
+      <h2 class="font-bold text-lg">Control de la votación</h2>
+      <label for="titleInput" class="block text-sm font-medium">Punto del día</label>
+      <input id="titleInput" class="w-full border rounded-xl p-3"
+             placeholder="Ej.: Aprobación de presupuestos">
+      <div class="flex flex-wrap gap-2">
+        <button onclick="createPoll()" class="rounded-xl bg-indigo-600 text-white px-4 py-3">
+          Crear punto y generar QR
+        </button>
+        <button id="toggleButton" onclick="togglePoll()" class="rounded-xl bg-amber-500 text-white px-4 py-3">
+          Cerrar votación
+        </button>
+      </div>
+      <p id="pollIdLabel" class="text-xs text-slate-500 break-all">Todavía no hay votación creada.</p>
+      <div class="flex flex-col items-center border rounded-xl p-4 gap-2">
+        <h3 class="font-semibold">QR para votar</h3>
+        <div id="qr"></div>
+        <a id="voterLink" class="text-indigo-600 text-sm underline break-all" target="_blank" rel="noopener"></a>
+      </div>
+    </div>
 
-  <!-- SCRIPT PRINCIPAL CON AUTO-CONFIGURACIÓN VÍA QR -->
-  <script>
-    const DEFAULT_SUPABASE_URL = "https://uoovpgixjqvxvsuwmboq.supabase.co";
-    const DEFAULT_SUPABASE_KEY = "sb_publishable_65EqGtk2nlDeTH_4dLdU3W_bO6oVWMk";
+    <div class="grid grid-cols-3 gap-3">
+      <div class="bg-emerald-50 rounded-xl p-4 text-center">
+        <p class="text-sm">SÍ</p><strong id="yes" class="text-3xl">0</strong>
+      </div>
+      <div class="bg-rose-50 rounded-xl p-4 text-center">
+        <p class="text-sm">NO</p><strong id="no" class="text-3xl">0</strong>
+      </div>
+      <div class="bg-amber-50 rounded-xl p-4 text-center">
+        <p class="text-sm">Abstención</p><strong id="abstain" class="text-3xl">0</strong>
+      </div>
+    </div>
 
-    function createSvgQRCode(text, size = 150) {
-      const encodeUrl = encodeURIComponent(text);
-      return `<img src="https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeUrl}" alt="QR Code" class="rounded-lg" style="width:${size}px; height:${size}px" />`;
+    <div class="bg-white rounded-2xl p-5 shadow-sm">
+      <h2 class="font-bold mb-4">Resultados en tiempo real</h2>
+      <p>Total de votos: <strong id="total">0</strong></p>
+      <div class="h-72"><canvas id="chart"></canvas></div>
+      <p id="message" class="text-sm mt-3 text-slate-500"></p>
+    </div>
+  </section>
+
+  <section id="projection" class="hidden space-y-5">
+    <div class="bg-white rounded-2xl p-6 text-center shadow-sm">
+      <p class="text-indigo-600 font-bold uppercase text-sm">Punto en votación</p>
+      <h2 id="projectionTitle" class="text-3xl font-black my-5">Esperando votación...</h2>
+      <p id="projectionStatus" class="font-semibold mb-5">Conectando...</p>
+      <div class="grid grid-cols-3 gap-3">
+        <div class="bg-emerald-50 rounded-xl p-4">
+          <p>SÍ</p><strong id="pYes" class="text-4xl">0</strong>
+        </div>
+        <div class="bg-rose-50 rounded-xl p-4">
+          <p>NO</p><strong id="pNo" class="text-4xl">0</strong>
+        </div>
+        <div class="bg-amber-50 rounded-xl p-4">
+          <p>Abstención</p><strong id="pAbstain" class="text-4xl">0</strong>
+        </div>
+      </div>
+      <p class="mt-4">Total de votos: <strong id="pTotal">0</strong></p>
+    </div>
+    <div class="bg-white rounded-2xl p-5">
+      <div class="h-80"><canvas id="pChart"></canvas></div>
+      <div id="pQr" class="flex justify-center mt-4"></div>
+    </div>
+  </section>
+
+  <section id="voter" class="hidden max-w-md mx-auto space-y-4">
+    <div class="bg-white rounded-2xl p-5 text-center shadow-sm">
+      <h2 id="voterTitle" class="font-bold text-xl">Cargando punto...</h2>
+      <p id="voterStatus" class="mt-2 text-sm">Conectando...</p>
+    </div>
+    <div id="voterButtons" class="space-y-3">
+      <button onclick="castVote('yes')" class="w-full rounded-2xl bg-emerald-600 text-white text-xl font-bold p-5">SÍ · A favor</button>
+      <button onclick="castVote('no')" class="w-full rounded-2xl bg-rose-600 text-white text-xl font-bold p-5">NO · En contra</button>
+      <button onclick="castVote('abstain')" class="w-full rounded-2xl bg-amber-500 text-white text-xl font-bold p-5">ABSTENCIÓN</button>
+    </div>
+    <p id="voterMessage" class="text-center text-sm" aria-live="polite"></p>
+  </section>
+
+</main>
+
+<script>
+'use strict';
+
+// Configuración pública de Supabase.
+// Utiliza únicamente la clave publishable/anon, nunca service_role.
+const SUPABASE_URL = 'https://uoovpgixjqvxvsuwmboq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_65EqGtk2nlDeTH_4dLdU3W_bO6oVWMk';
+
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const params = new URLSearchParams(location.search);
+let role = params.get('role') || 'secretary';
+let pollId = params.get('poll') || null;
+let poll = { id: null, title: '', is_open: false };
+let votes = {};
+let channel = null;
+let loadingVotes = false;
+let chart = null;
+let projectionChart = null;
+let refreshTimer = null;
+let voterId = localStorage.getItem('asamblea_voter_id');
+
+if (!voterId) {
+  voterId = crypto.randomUUID
+    ? crypto.randomUUID()
+    : 'voter_' + Math.random().toString(36).slice(2) + Date.now();
+  localStorage.setItem('asamblea_voter_id', voterId);
+}
+
+const $ = id => document.getElementById(id);
+
+function setConnection(text, good = false) {
+  $('connection').textContent = text;
+  $('connection').className = 'rounded-lg p-3 text-sm ' +
+    (good ? 'bg-emerald-100 text-emerald-900' :
+            'bg-amber-100 text-amber-900');
+}
+
+function setRole(newRole) {
+  if (!['secretary', 'projection', 'voter'].includes(newRole)) return;
+  role = newRole;
+
+  $('header').classList.toggle('hidden', role === 'voter');
+  $('nav').classList.toggle('hidden', role === 'voter');
+  $('secretary').classList.toggle('hidden', role !== 'secretary');
+  $('projection').classList.toggle('hidden', role !== 'projection');
+  $('voter').classList.toggle('hidden', role !== 'voter');
+
+  if (role === 'voter') {
+    $('connection').classList.add('hidden');
+  } else {
+    $('connection').classList.remove('hidden');
+  }
+
+  render();
+}
+
+function initCharts() {
+  const config = {
+    type: 'bar',
+    data: {
+      labels: ['SÍ', 'NO', 'ABSTENCIÓN'],
+      datasets: [{
+        label: 'Votos',
+        data: [0, 0, 0],
+        backgroundColor: ['#059669', '#e11d48', '#d97706']
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 } }
+      }
+    }
+  };
+
+  chart = new Chart($('chart'), structuredClone(config));
+  projectionChart = new Chart($('pChart'), structuredClone(config));
+}
+
+function render() {
+  const counts = { yes: 0, no: 0, abstain: 0 };
+
+  Object.values(votes).forEach(choice => {
+    if (Object.hasOwn(counts, choice)) counts[choice]++;
+  });
+
+  const total = counts.yes + counts.no + counts.abstain;
+  const title = poll.title || 'Esperando punto a votar...';
+  const status = poll.is_open ? 'Votación abierta' : 'Votación cerrada';
+
+  $('yes').textContent = counts.yes;
+  $('no').textContent = counts.no;
+  $('abstain').textContent = counts.abstain;
+  $('total').textContent = total;
+
+  $('projectionTitle').textContent = title;
+  $('projectionStatus').textContent = status;
+  $('pYes').textContent = counts.yes;
+  $('pNo').textContent = counts.no;
+  $('pAbstain').textContent = counts.abstain;
+  $('pTotal').textContent = total;
+
+  $('voterTitle').textContent = title;
+  $('voterStatus').textContent = status;
+  $('voterButtons').classList.toggle('hidden', !poll.is_open);
+
+  $('toggleButton').textContent =
+    poll.is_open ? 'Cerrar votación' : 'Abrir votación';
+  $('toggleButton').disabled = !poll.id;
+
+  $('pollIdLabel').textContent =
+    poll.id ? 'ID de la votación: ' + poll.id : 'Todavía no hay votación creada.';
+
+  if (chart) {
+    chart.data.datasets[0].data =
+      [counts.yes, counts.no, counts.abstain];
+    chart.update();
+  }
+
+  if (projectionChart) {
+    projectionChart.data.datasets[0].data =
+      [counts.yes, counts.no, counts.abstain];
+    projectionChart.update();
+  }
+}
+
+function updateQr() {
+  const qr = $('qr');
+  const pQr = $('pQr');
+  const link = $('voterLink');
+
+  qr.replaceChildren();
+  pQr.replaceChildren();
+  link.textContent = '';
+  link.removeAttribute('href');
+
+  if (!poll.id) return;
+
+  const url = new URL(location.pathname, location.origin);
+  url.searchParams.set('role', 'voter');
+  url.searchParams.set('poll', poll.id);
+
+  const voterUrl = url.href;
+  link.href = voterUrl;
+  link.textContent = voterUrl;
+
+  const imageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='
+    + encodeURIComponent(voterUrl);
+
+  const img = document.createElement('img');
+  img.src = imageUrl;
+  img.alt = 'QR para votar';
+  img.width = 220;
+  img.height = 220;
+  qr.appendChild(img);
+  pQr.appendChild(img.cloneNode());
+}
+
+async function loadPoll(id) {
+  if (!id) return;
+
+  const { data, error } = await db
+    .from('polls')
+    .select('id,title,is_open,updated_at')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error leyendo votación:', error);
+    setConnection('Error leyendo la votación: ' + error.message);
+    return;
+  }
+
+  if (!data) {
+    if (role === 'voter') {
+      $('voterMessage').textContent =
+        'No existe esta votación. Pide al secretario un QR actualizado.';
+    }
+    return;
+  }
+
+  poll = {
+    id: data.id,
+    title: data.title,
+    is_open: data.is_open
+  };
+  pollId = data.id;
+
+  if (role === 'secretary') $('titleInput').value = poll.title;
+
+  render();
+  updateQr();
+  await loadVotes(id);
+}
+
+async function loadVotes(id) {
+  if (!id || loadingVotes) return;
+  loadingVotes = true;
+
+  try {
+    const { data, error } = await db
+      .from('votes')
+      .select('poll_id,voter_id,choice')
+      .eq('poll_id', id);
+
+    if (error) {
+      console.error('Error leyendo votos:', error);
+      setConnection('Error leyendo votos: ' + error.message);
+      return;
     }
 
-    let currentRole = 'secretary';
-    let isVoterOnly = false;
-    let pollState = {
-      id: Date.now().toString(),
-      title: '',
-      isOpen: true,
-      votes: {}
-    };
+    // No mezclar resultados de dos puntos diferentes.
+    if (poll.id !== id) return;
 
-    let historyLogs = JSON.parse(localStorage.getItem('asamblea_history_logs') || '[]');
-    let voterId = getOrCreateVoterId();
+    const nextVotes = {};
+    for (const row of data || []) {
+      nextVotes[row.voter_id] = row.choice;
+    }
 
-    let supabaseClient = null;
-    let supabaseChannel = null;
-    let localBroadcastChannel = null;
-    let chartInstance = null;
-    let projChartInstance = null;
+    votes = nextVotes;
+    render();
+    setConnection('Conectado a Supabase. Sincronización activa.', true);
+  } finally {
+    loadingVotes = false;
+  }
+}
 
-    window.addEventListener('load', () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      
-      // AUTO-CAPTURA: Guardar credenciales si vienen en la URL del QR
-      const paramUrl = urlParams.get('sUrl');
-      const paramKey = urlParams.get('sKey');
-      if (paramUrl && paramKey) {
-        localStorage.setItem('supabase_url', decodeURIComponent(paramUrl));
-        localStorage.setItem('supabase_key', decodeURIComponent(paramKey));
-      }
+async function createPoll() {
+  const title = $('titleInput').value.trim();
 
-      const urlRole = urlParams.get('role');
-      const urlPollId = urlParams.get('poll');
-      const urlTitle = urlParams.get('title');
+  if (!title) {
+    alert('Escribe el punto que se va a votar.');
+    return;
+  }
 
-      if (urlRole === 'voter') {
-        currentRole = 'voter';
-        isVoterOnly = true;
-      } else if (urlRole === 'projection') {
-        currentRole = 'projection';
-      }
+  const newId = crypto.randomUUID
+    ? crypto.randomUUID()
+    : String(Date.now());
 
-      if (urlPollId) {
-        pollState.id = urlPollId;
-      }
-      if (urlTitle) {
-        pollState.title = decodeURIComponent(urlTitle);
-      }
+  const newPoll = {
+    id: newId,
+    title,
+    is_open: true,
+    updated_at: new Date().toISOString()
+  };
 
-      initCharts();
-      initCommunication();
-      setRole(currentRole);
-      renderHistory();
-      updateQR();
+  const { error } = await db.from('polls').insert(newPoll);
 
-      if (currentRole === 'voter' || currentRole === 'projection') {
-        setTimeout(() => {
-          broadcastState({ type: 'REQUEST_STATE' });
-          fetchVotesFromSupabase();
-        }, 500);
-      }
+  if (error) {
+    console.error('Error creando votación:', error);
+    alert('No se pudo crear la votación: ' + error.message);
+    return;
+  }
+
+  poll = { id: newId, title, is_open: true };
+  pollId = newId;
+  votes = {};
+
+  await subscribeToPoll(newId);
+  render();
+  updateQr();
+  history.replaceState({}, '', location.pathname);
+}
+
+async function togglePoll() {
+  if (!poll.id) {
+    alert('Primero crea un punto de votación.');
+    return;
+  }
+
+  const updated = {
+    is_open: !poll.is_open,
+    updated_at: new Date().toISOString()
+  };
+
+  const { data, error } = await db
+    .from('polls')
+    .update(updated)
+    .eq('id', poll.id)
+    .select('id,title,is_open')
+    .single();
+
+  if (error) {
+    console.error('Error cambiando estado:', error);
+    alert('No se pudo cambiar el estado: ' + error.message);
+    return;
+  }
+
+  poll = data;
+  render();
+}
+
+async function castVote(choice) {
+  if (!poll.id || !poll.is_open) {
+    $('voterMessage').textContent = 'La votación no está abierta.';
+    return;
+  }
+
+  $('voterMessage').textContent = 'Guardando voto...';
+
+  // Verifica el estado compartido antes de guardar.
+  const { data: latest, error: pollError } = await db
+    .from('polls')
+    .select('id,is_open')
+    .eq('id', poll.id)
+    .maybeSingle();
+
+  if (pollError || !latest || !latest.is_open) {
+    $('voterMessage').textContent =
+      'No se pudo confirmar que la votación siga abierta.';
+    if (latest) {
+      poll.is_open = latest.is_open;
+      render();
+    }
+    return;
+  }
+
+  const id = poll.id;
+
+  const { error } = await db
+    .from('votes')
+    .upsert({
+      poll_id: id,
+      voter_id: voterId,
+      choice,
+      created_at: new Date().toISOString()
+    }, {
+      onConflict: 'poll_id,voter_id'
     });
 
-    function getOrCreateVoterId() {
-      let id = localStorage.getItem('asamblea_voter_id');
-      if (!id) {
-        id = 'voter_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('asamblea_voter_id', id);
+  if (error) {
+    console.error('Error guardando voto:', error);
+    $('voterMessage').textContent = 'Error guardando el voto: ' + error.message;
+    return;
+  }
+
+  $('voterMessage').textContent =
+    'Voto guardado: ' +
+    (choice === 'yes' ? 'SÍ' :
+     choice === 'no' ? 'NO' : 'ABSTENCIÓN') +
+    '. Puedes cambiarlo mientras siga abierta la votación.';
+
+  await loadVotes(id);
+}
+
+async function subscribeToPoll(id) {
+  if (channel) {
+    await db.removeChannel(channel);
+    channel = null;
+  }
+
+  channel = db.channel('assembly-' + id)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'votes',
+      filter: 'poll_id=eq.' + id
+    }, async () => {
+      await loadVotes(id);
+    })
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'polls',
+      filter: 'id=eq.' + id
+    }, async () => {
+      await loadPoll(id);
+    })
+    .subscribe(status => {
+      console.log('Realtime:', status);
+      if (status === 'SUBSCRIBED') {
+        setConnection('Conectado a Supabase. Realtime activo.', true);
+        loadPoll(id);
+      } else if (status === 'CHANNEL_ERROR' ||
+                 status === 'TIMED_OUT' ||
+                 status === 'CLOSED') {
+        setConnection('Realtime desconectado: ' + status);
       }
-      return id;
+    });
+}
+
+async function start() {
+  initCharts();
+  setRole(role);
+
+  if (pollId) {
+    await subscribeToPoll(pollId);
+    await loadPoll(pollId);
+  } else if (role === 'voter') {
+    $('voterMessage').textContent =
+      'El QR no contiene el identificador de la votación.';
+  }
+
+  // Respaldo por si una notificación Realtime se pierde.
+  refreshTimer = setInterval(async () => {
+    if (poll.id) {
+      await loadPoll(poll.id);
     }
+  }, 5000);
+}
 
-    function toggleConfigModal() {
-      const modal = document.getElementById('configModal');
-      modal.classList.toggle('hidden');
-      if (!modal.classList.contains('hidden')) {
-        document.getElementById('supabaseUrlInput').value = localStorage.getItem('supabase_url') || DEFAULT_SUPABASE_URL;
-        document.getElementById('supabaseKeyInput').value = localStorage.getItem('supabase_key') || DEFAULT_SUPABASE_KEY;
-      }
-    }
+window.addEventListener('beforeunload', () => {
+  if (refreshTimer) clearInterval(refreshTimer);
+  if (channel) db.removeChannel(channel);
+});
 
-    function saveSupabaseConfig() {
-      const url = document.getElementById('supabaseUrlInput').value.trim();
-      const key = document.getElementById('supabaseKeyInput').value.trim();
-
-      if (url && key) {
-        localStorage.setItem('supabase_url', url);
-        localStorage.setItem('supabase_key', key);
-        initCommunication();
-        updateQR();
-        toggleConfigModal();
-        alert("¡Configuración de Supabase guardada y conectada!");
-      }
-    }
-
-    function setRole(role) {
-      currentRole = role;
-
-      const mainHeader = document.getElementById('mainHeader');
-      const secretaryNavControls = document.getElementById('secretaryNavControls');
-
-      if (isVoterOnly) {
-        mainHeader.classList.add('hidden');
-      } else {
-        mainHeader.classList.remove('hidden');
-        secretaryNavControls.classList.remove('hidden');
-      }
-
-      const activeClass = "px-3 py-1 rounded-lg text-xs font-semibold transition bg-indigo-600 text-white shadow-sm";
-      const inactiveClass = "px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition";
-
-      document.getElementById('btnRoleSecretary').className = role === 'secretary' ? activeClass : inactiveClass;
-      document.getElementById('btnRoleProjection').className = role === 'projection' ? activeClass : inactiveClass;
-      document.getElementById('btnRoleVoter').className = role === 'voter' ? activeClass : inactiveClass;
-
-      document.getElementById('viewSecretary').classList.toggle('hidden', role !== 'secretary');
-      document.getElementById('viewSecretary').classList.toggle('block', role === 'secretary');
-
-      document.getElementById('viewProjection').classList.toggle('hidden', role !== 'projection');
-      document.getElementById('viewProjection').classList.toggle('block', role === 'projection');
-
-      document.getElementById('viewVoter').classList.toggle('hidden', role !== 'voter');
-      document.getElementById('viewVoter').classList.toggle('block', role === 'voter');
-
-      updateUI();
-    }
-
-    function initCommunication() {
-      if ('BroadcastChannel' in window) {
-        localBroadcastChannel = new BroadcastChannel('asamblea_channel');
-        localBroadcastChannel.onmessage = (event) => {
-          handleIncomingMessage(event.data);
-        };
-      }
-
-      const savedUrl = localStorage.getItem('supabase_url') || DEFAULT_SUPABASE_URL;
-      const savedKey = localStorage.getItem('supabase_key') || DEFAULT_SUPABASE_KEY;
-
-      if (savedUrl && savedKey && window.supabase) {
-        try {
-          supabaseClient = window.supabase.createClient(savedUrl, savedKey);
-          
-          supabaseChannel = supabaseClient.channel('asamblea_realtime')
-            .on('broadcast', { event: 'state_update' }, payload => handleIncomingMessage(payload.payload))
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, payload => {
-              fetchVotesFromSupabase();
-            })
-            .subscribe();
-
-          fetchVotesFromSupabase();
-          // Respaldo periódico para consultar la base de datos
-          setInterval(fetchVotesFromSupabase, 3000);
-        } catch (e) {
-          console.error("Error al conectar Supabase:", e);
-        }
-      }
-    }
-
-    function broadcastState(msg) {
-      if (localBroadcastChannel) {
-        localBroadcastChannel.postMessage(msg);
-      }
-      if (supabaseChannel) {
-        supabaseChannel.send({
-          type: 'broadcast',
-          event: 'state_update',
-          payload: msg
-        });
-      }
-    }
-
-    async function castVote(choice) {
-      if (!pollState.isOpen) return;
-
-      pollState.votes[voterId] = choice;
-
-      document.getElementById('voterChoiceAlert').classList.remove('hidden');
-      document.getElementById('voterChoiceText').innerText = choice === 'yes' ? 'SÍ' : choice === 'no' ? 'NO' : 'ABSTENCIÓN';
-
-      if (supabaseClient) {
-        try {
-          const { error } = await supabaseClient
-            .from('votes')
-            .upsert({ 
-              poll_id: pollState.id, 
-              voter_id: voterId, 
-              choice: choice,
-              created_at: new Date().toISOString()
-            }, { onConflict: 'poll_id,voter_id' });
-
-          if (error) {
-            console.error("Error al registrar voto en Supabase:", error.message);
-          }
-        } catch(err) {
-          console.error("Excepción al insertar voto:", err);
-        }
-      }
-
-      broadcastState({ type: 'CAST_VOTE', pollId: pollState.id, voterId: voterId, choice: choice });
-      updateUI();
-    }
-
-    async function fetchVotesFromSupabase() {
-      if (!supabaseClient) return;
-      try {
-        const { data, error } = await supabaseClient
-          .from('votes')
-          .select('*')
-          .eq('poll_id', pollState.id);
-
-        if (!error && data) {
-          const newVotes = {};
-          data.forEach(row => {
-            newVotes[row.voter_id] = row.choice;
-          });
-          pollState.votes = newVotes;
-          updateUI();
-        }
-      } catch(err) {
-        console.error("Error obteniendo votos:", err);
-      }
-    }
-
-    function handleIncomingMessage(msg) {
-      if (!msg) return;
-
-      if (msg.type === 'SYNC_STATE') {
-        pollState = msg.state;
-        updateUI();
-        updateQR();
-      } else if (msg.type === 'REQUEST_STATE') {
-        if (currentRole === 'secretary') {
-          broadcastState({ type: 'SYNC_STATE', state: pollState });
-        }
-      } else if (msg.type === 'CAST_VOTE') {
-        if (pollState.isOpen && msg.pollId === pollState.id) {
-          pollState.votes[msg.voterId] = msg.choice;
-          updateUI();
-          if (currentRole === 'secretary') {
-            broadcastState({ type: 'SYNC_STATE', state: pollState });
-          }
-        }
-      } else if (msg.type === 'SYNC_HISTORY') {
-        historyLogs = msg.history;
-        localStorage.setItem('asamblea_history_logs', JSON.stringify(historyLogs));
-        renderHistory();
-      }
-    }
-
-    function applyPollTitle() {
-      const input = document.getElementById('pollTitleInput');
-      const val = input.value.trim();
-      if (!val) return;
-
-      pollState.id = Date.now().toString();
-      pollState.title = val;
-      pollState.isOpen = true;
-      pollState.votes = {};
-
-      updateUI();
-      updateQR();
-      broadcastState({ type: 'SYNC_STATE', state: pollState });
-      fetchVotesFromSupabase();
-    }
-
-    function togglePollStatus() {
-      pollState.isOpen = !pollState.isOpen;
-      updateUI();
-      broadcastState({ type: 'SYNC_STATE', state: pollState });
-
-      if (!pollState.isOpen && currentRole === 'secretary' && pollState.title) {
-        saveCurrentToHistory();
-      }
-    }
-
-    function resetPoll() {
-      pollState = {
-        id: Date.now().toString(),
-        title: '',
-        isOpen: true,
-        votes: {}
-      };
-      document.getElementById('pollTitleInput').value = '';
-      document.getElementById('voterChoiceAlert').classList.add('hidden');
-      updateUI();
-      updateQR();
-      broadcastState({ type: 'SYNC_STATE', state: pollState });
-    }
-
-    function updateUI() {
-      let yes = 0, no = 0, abs = 0;
-      Object.values(pollState.votes).forEach(val => {
-        if (val === 'yes') yes++;
-        if (val === 'no') no++;
-        if (val === 'abstain') abs++;
-      });
-      const total = yes + no + abs;
-
-      document.getElementById('countYes').innerText = yes;
-      document.getElementById('countNo').innerText = no;
-      document.getElementById('countAbs').innerText = abs;
-      document.getElementById('totalVotesCount').innerText = total;
-
-      document.getElementById('projCountYes').innerText = yes;
-      document.getElementById('projCountNo').innerText = no;
-      document.getElementById('projCountAbs').innerText = abs;
-      document.getElementById('projTotalVotesCount').innerText = total;
-
-      const titleText = pollState.title || 'Esperando punto a votar...';
-      document.getElementById('projPollTitle').innerText = titleText;
-      document.getElementById('voterPollTitle').innerText = titleText;
-
-      const statusText = pollState.isOpen ? 'Votación Abierta' : 'Votación Cerrada';
-      document.getElementById('statusText').innerText = statusText;
-      document.getElementById('projStatusText').innerText = statusText;
-      document.getElementById('voterStatusText').innerText = statusText;
-
-      const btnToggleText = document.getElementById('btnTogglePollText');
-      if (btnToggleText) {
-        btnToggleText.innerText = pollState.isOpen ? 'Cerrar Votación' : 'Abrir Votación';
-      }
-
-      document.getElementById('votingButtonsContainer').classList.toggle('hidden', !pollState.isOpen);
-      document.getElementById('voterClosedNotice').classList.toggle('hidden', pollState.isOpen);
-
-      if (chartInstance) {
-        chartInstance.data.datasets[0].data = [yes, no, abs];
-        chartInstance.update();
-      }
-      if (projChartInstance) {
-        projChartInstance.data.datasets[0].data = [yes, no, abs];
-        projChartInstance.update();
-      }
-    }
-
-    // FUNCIÓN ACTUALIZADA: Genera el QR con la URL y la Key incrustadas
-    function updateQR() {
-      const baseUrl = window.location.origin + window.location.pathname;
-      const encodedTitle = encodeURIComponent(pollState.title || '');
-      
-      const savedUrl = localStorage.getItem('supabase_url') || DEFAULT_SUPABASE_URL;
-      const savedKey = localStorage.getItem('supabase_key') || DEFAULT_SUPABASE_KEY;
-
-      const voterUrl = `${baseUrl}?role=voter&poll=${pollState.id}&title=${encodedTitle}&sUrl=${encodeURIComponent(savedUrl)}&sKey=${encodeURIComponent(savedKey)}`;
-      
-      const qrTextElement = document.getElementById('qrUrlText');
-      const qrContainer = document.getElementById('qrcode');
-      const projQrContainer = document.getElementById('projQrcode');
-
-      if (qrTextElement) qrTextElement.innerText = voterUrl;
-      if (qrContainer) qrContainer.innerHTML = createSvgQRCode(voterUrl, 150);
-      if (projQrContainer) projQrContainer.innerHTML = createSvgQRCode(voterUrl, 230);
-    }
-
-    function saveCurrentToHistory() {
-      let yes = 0, no = 0, abs = 0;
-      Object.values(pollState.votes).forEach(val => {
-        if (val === 'yes') yes++;
-        if (val === 'no') no++;
-        if (val === 'abstain') abs++;
-      });
-
-      const entry = {
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        title: pollState.title || 'Punto Sin Título',
-        yes, no, abs,
-        total: yes + no + abs
-      };
-
-      historyLogs.unshift(entry);
-      localStorage.setItem('asamblea_history_logs', JSON.stringify(historyLogs));
-      renderHistory();
-      broadcastState({ type: 'SYNC_HISTORY', history: historyLogs });
-    }
-
-    function renderHistory() {
-      const tbody = document.getElementById('historyTableBody');
-      if (!tbody) return;
-
-      if (historyLogs.length === 0) {
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="6" class="px-4 py-6 text-center text-slate-400 italic">
-              Aún no se ha guardado ninguna votación en esta sesión.
-            </td>
-          </tr>`;
-        return;
-      }
-
-      tbody.innerHTML = historyLogs.map(item => `
-        <tr class="hover:bg-slate-50 border-b border-slate-100 transition">
-          <td class="px-4 py-3 font-mono text-slate-500">${item.time}</td>
-          <td class="px-4 py-3 font-semibold text-slate-900">${item.title}</td>
-          <td class="px-4 py-3 text-center font-bold text-emerald-700 bg-emerald-50/50">${item.yes}</td>
-          <td class="px-4 py-3 text-center font-bold text-rose-700 bg-rose-50/50">${item.no}</td>
-          <td class="px-4 py-3 text-center font-bold text-amber-700 bg-amber-50/50">${item.abs}</td>
-          <td class="px-4 py-3 text-center font-black text-slate-900">${item.total}</td>
-        </tr>
-      `).join('');
-    }
-
-    function clearHistory() {
-      if (confirm("¿Estás seguro de que deseas borrar el historial de esta sesión?")) {
-        historyLogs = [];
-        localStorage.removeItem('asamblea_history_logs');
-        renderHistory();
-        broadcastState({ type: 'SYNC_HISTORY', history: historyLogs });
-      }
-    }
-
-    function exportToExcel() {
-      if (historyLogs.length === 0) return alert("No hay datos en el historial para exportar.");
-      const wsData = [
-        ["Hora", "Punto Votado", "SÍ", "NO", "ABSTENCIÓN", "TOTAL"],
-        ...historyLogs.map(i => [i.time, i.title, i.yes, i.no, i.abs, i.total])
-      ];
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Asamblea_Resultados");
-      XLSX.writeFile(wb, `Acta_Asamblea_${new Date().toISOString().slice(0,10)}.xlsx`);
-    }
-
-    function exportToPDF() {
-      if (historyLogs.length === 0) return alert("No hay datos en el historial para exportar.");
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-
-      doc.setFontSize(16);
-      doc.text("Acta de Resultados - Votaciones de Asamblea", 14, 20);
-      doc.setFontSize(10);
-      doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 28);
-
-      const tableRows = historyLogs.map(i => [i.time, i.title, i.yes, i.no, i.abs, i.total]);
-      doc.autoTable({
-        startY: 35,
-        head: [["Hora", "Punto Votado", "SÍ", "NO", "ABSTENCIÓN", "TOTAL"]],
-        body: tableRows,
-        theme: 'striped',
-        headStyles: { fillColor: [79, 70, 229] }
-      });
-
-      doc.save(`Acta_Asamblea_${new Date().toISOString().slice(0,10)}.pdf`);
-    }
-
-    function initCharts() {
-      const ctx = document.getElementById('resultsChart').getContext('2d');
-      chartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: ['SÍ', 'NO', 'ABSTENCIÓN'],
-          datasets: [{
-            data: [0, 0, 0],
-            backgroundColor: ['#059669', '#e11d48', '#d97706'],
-            borderRadius: 8
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: { beginAtZero: true, ticks: { precision: 0, color: '#64748b' }, grid: { color: '#e2e8f0' } },
-            x: { ticks: { color: '#334155', font: { weight: 'bold' } }, grid: { display: false } }
-          }
-        }
-      });
-
-      const projCtx = document.getElementById('projResultsChart').getContext('2d');
-      projChartInstance = new Chart(projCtx, {
-        type: 'bar',
-        data: {
-          labels: ['SÍ', 'NO', 'ABSTENCIÓN'],
-          datasets: [{
-            data: [0, 0, 0],
-            backgroundColor: ['#059669', '#e11d48', '#d97706'],
-            borderRadius: 12
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: { beginAtZero: true, ticks: { precision: 0, color: '#64748b', font: { size: 14 } }, grid: { color: '#e2e8f0' } },
-            x: { ticks: { color: '#334155', font: { weight: 'bold', size: 14 } }, grid: { display: false } }
-          }
-        }
-      });
-    }
-  </script>
+start().catch(error => {
+  console.error('Error iniciando la aplicación:', error);
+  setConnection('No se pudo iniciar la aplicación: ' + error.message);
+});
+</script>
 </body>
 </html>
