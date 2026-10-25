@@ -68,7 +68,6 @@
 
     <!-- VISTA DEL SECRETARIO -->
     <div id="viewSecretary" class="space-y-6 block">
-      
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         <!-- Controles de la Votación -->
@@ -370,7 +369,7 @@
       </div>
 
       <p class="text-xs text-slate-600">
-        Introduce tus credenciales de Supabase para conectar 50 teléfonos móviles en redes 4G/5G en tiempo real:
+        Introduce tus credenciales de Supabase para conectar teléfonos móviles en redes 4G/5G en tiempo real:
       </p>
 
       <div class="space-y-3">
@@ -380,7 +379,7 @@
         </div>
         <div>
           <label class="block text-xs font-medium text-slate-600 mb-1">Supabase Anon Key</label>
-          <input type="password" id="supabaseKeyInput" placeholder="eyJhbGciOiJIUzI1NiIsIn..." class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <input type="password" id="supabaseKeyInput" placeholder="sb_publishable_..." class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500">
         </div>
       </div>
 
@@ -397,8 +396,11 @@
     Votación Digital para Asambleas &copy; 2026
   </footer>
 
-  <!-- SCRIPT PRINCIPAL -->
+  <!-- SCRIPT PRINCIPAL CORREGIDO -->
   <script>
+    const DEFAULT_SUPABASE_URL = "https://uoovpgixjqvxvsuwmboq.supabase.co";
+    const DEFAULT_SUPABASE_KEY = "sb_publishable_65EqGtk2nlDeTH_4dLdU3W_bO6oVWMk";
+
     function createSvgQRCode(text, size = 150) {
       const encodeUrl = encodeURIComponent(text);
       return `<img src="https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeUrl}" alt="QR Code" class="rounded-lg" style="width:${size}px; height:${size}px" />`;
@@ -452,6 +454,7 @@
       if (currentRole === 'voter' || currentRole === 'projection') {
         setTimeout(() => {
           broadcastState({ type: 'REQUEST_STATE' });
+          fetchVotesFromSupabase();
         }, 500);
       }
     });
@@ -463,6 +466,28 @@
         localStorage.setItem('asamblea_voter_id', id);
       }
       return id;
+    }
+
+    function toggleConfigModal() {
+      const modal = document.getElementById('configModal');
+      modal.classList.toggle('hidden');
+      if (!modal.classList.contains('hidden')) {
+        document.getElementById('supabaseUrlInput').value = localStorage.getItem('supabase_url') || DEFAULT_SUPABASE_URL;
+        document.getElementById('supabaseKeyInput').value = localStorage.getItem('supabase_key') || DEFAULT_SUPABASE_KEY;
+      }
+    }
+
+    function saveSupabaseConfig() {
+      const url = document.getElementById('supabaseUrlInput').value.trim();
+      const key = document.getElementById('supabaseKeyInput').value.trim();
+
+      if (url && key) {
+        localStorage.setItem('supabase_url', url);
+        localStorage.setItem('supabase_key', key);
+        initCommunication();
+        toggleConfigModal();
+        alert("¡Configuración de Supabase guardada y conectada!");
+      }
     }
 
     function setRole(role) {
@@ -505,15 +530,21 @@
         };
       }
 
-      const savedUrl = localStorage.getItem('supabase_url');
-      const savedKey = localStorage.getItem('supabase_key');
+      const savedUrl = localStorage.getItem('supabase_url') || DEFAULT_SUPABASE_URL;
+      const savedKey = localStorage.getItem('supabase_key') || DEFAULT_SUPABASE_KEY;
 
       if (savedUrl && savedKey && window.supabase) {
         try {
           supabaseClient = window.supabase.createClient(savedUrl, savedKey);
+          
           supabaseChannel = supabaseClient.channel('asamblea_realtime')
             .on('broadcast', { event: 'state_update' }, payload => handleIncomingMessage(payload.payload))
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, payload => {
+              fetchVotesFromSupabase();
+            })
             .subscribe();
+
+          fetchVotesFromSupabase();
         } catch (e) {
           console.error("Error al conectar Supabase:", e);
         }
@@ -530,6 +561,58 @@
           event: 'state_update',
           payload: msg
         });
+      }
+    }
+
+    async function castVote(choice) {
+      if (!pollState.isOpen) return;
+
+      pollState.votes[voterId] = choice;
+
+      document.getElementById('voterChoiceAlert').classList.remove('hidden');
+      document.getElementById('voterChoiceText').innerText = choice === 'yes' ? 'SÍ' : choice === 'no' ? 'NO' : 'ABSTENCIÓN';
+
+      if (supabaseClient) {
+        try {
+          const { error } = await supabaseClient
+            .from('votes')
+            .upsert({ 
+              poll_id: pollState.id, 
+              voter_id: voterId, 
+              choice: choice,
+              created_at: new Date().toISOString()
+            }, { onConflict: 'poll_id,voter_id' });
+
+          if (error) {
+            console.error("Error al registrar voto en Supabase:", error.message);
+          }
+        } catch(err) {
+          console.error("Excepción al insertar voto:", err);
+        }
+      }
+
+      broadcastState({ type: 'CAST_VOTE', pollId: pollState.id, voterId: voterId, choice: choice });
+      updateUI();
+    }
+
+    async function fetchVotesFromSupabase() {
+      if (!supabaseClient) return;
+      try {
+        const { data, error } = await supabaseClient
+          .from('votes')
+          .select('*')
+          .eq('poll_id', pollState.id);
+
+        if (!error && data) {
+          const newVotes = {};
+          data.forEach(row => {
+            newVotes[row.voter_id] = row.choice;
+          });
+          pollState.votes = newVotes;
+          updateUI();
+        }
+      } catch(err) {
+        console.error("Error obteniendo votos:", err);
       }
     }
 
@@ -559,6 +642,92 @@
       }
     }
 
+    function applyPollTitle() {
+      const input = document.getElementById('pollTitleInput');
+      const val = input.value.trim();
+      if (!val) return;
+
+      pollState.id = Date.now().toString();
+      pollState.title = val;
+      pollState.isOpen = true;
+      pollState.votes = {};
+
+      updateUI();
+      updateQR();
+      broadcastState({ type: 'SYNC_STATE', state: pollState });
+      fetchVotesFromSupabase();
+    }
+
+    function togglePollStatus() {
+      pollState.isOpen = !pollState.isOpen;
+      updateUI();
+      broadcastState({ type: 'SYNC_STATE', state: pollState });
+
+      if (!pollState.isOpen && currentRole === 'secretary' && pollState.title) {
+        saveCurrentToHistory();
+      }
+    }
+
+    function resetPoll() {
+      pollState = {
+        id: Date.now().toString(),
+        title: '',
+        isOpen: true,
+        votes: {}
+      };
+      document.getElementById('pollTitleInput').value = '';
+      document.getElementById('voterChoiceAlert').classList.add('hidden');
+      updateUI();
+      updateQR();
+      broadcastState({ type: 'SYNC_STATE', state: pollState });
+    }
+
+    function updateUI() {
+      let yes = 0, no = 0, abs = 0;
+      Object.values(pollState.votes).forEach(val => {
+        if (val === 'yes') yes++;
+        if (val === 'no') no++;
+        if (val === 'abstain') abs++;
+      });
+      const total = yes + no + abs;
+
+      document.getElementById('countYes').innerText = yes;
+      document.getElementById('countNo').innerText = no;
+      document.getElementById('countAbs').innerText = abs;
+      document.getElementById('totalVotesCount').innerText = total;
+
+      document.getElementById('projCountYes').innerText = yes;
+      document.getElementById('projCountNo').innerText = no;
+      document.getElementById('projCountAbs').innerText = abs;
+      document.getElementById('projTotalVotesCount').innerText = total;
+
+      const titleText = pollState.title || 'Esperando punto a votar...';
+      document.getElementById('projPollTitle').innerText = titleText;
+      document.getElementById('voterPollTitle').innerText = titleText;
+
+      const statusText = pollState.isOpen ? 'Votación Abierta' : 'Votación Cerrada';
+      document.getElementById('statusText').innerText = statusText;
+      document.getElementById('projStatusText').innerText = statusText;
+      document.getElementById('voterStatusText').innerText = statusText;
+
+      const btnToggleText = document.getElementById('btnTogglePollText');
+      if (btnToggleText) {
+        btnToggleText.innerText = pollState.isOpen ? 'Cerrar Votación' : 'Abrir Votación';
+      }
+
+      document.getElementById('votingButtonsContainer').classList.toggle('hidden', !pollState.isOpen);
+      document.getElementById('voterClosedNotice').classList.toggle('hidden', pollState.isOpen);
+
+      if (chartInstance) {
+        chartInstance.data.datasets[0].data = [yes, no, abs];
+        chartInstance.update();
+      }
+      if (projChartInstance) {
+        projChartInstance.data.datasets[0].data = [yes, no, abs];
+        projChartInstance.update();
+      }
+    }
+
     function updateQR() {
       const baseUrl = window.location.origin + window.location.pathname;
       const encodedTitle = encodeURIComponent(pollState.title || '');
@@ -571,6 +740,96 @@
       if (qrTextElement) qrTextElement.innerText = voterUrl;
       if (qrContainer) qrContainer.innerHTML = createSvgQRCode(voterUrl, 150);
       if (projQrContainer) projQrContainer.innerHTML = createSvgQRCode(voterUrl, 230);
+    }
+
+    function saveCurrentToHistory() {
+      let yes = 0, no = 0, abs = 0;
+      Object.values(pollState.votes).forEach(val => {
+        if (val === 'yes') yes++;
+        if (val === 'no') no++;
+        if (val === 'abstain') abs++;
+      });
+
+      const entry = {
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        title: pollState.title || 'Punto Sin Título',
+        yes, no, abs,
+        total: yes + no + abs
+      };
+
+      historyLogs.unshift(entry);
+      localStorage.setItem('asamblea_history_logs', JSON.stringify(historyLogs));
+      renderHistory();
+      broadcastState({ type: 'SYNC_HISTORY', history: historyLogs });
+    }
+
+    function renderHistory() {
+      const tbody = document.getElementById('historyTableBody');
+      if (!tbody) return;
+
+      if (historyLogs.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="px-4 py-6 text-center text-slate-400 italic">
+              Aún no se ha guardado ninguna votación en esta sesión.
+            </td>
+          </tr>`;
+        return;
+      }
+
+      tbody.innerHTML = historyLogs.map(item => `
+        <tr class="hover:bg-slate-50 border-b border-slate-100 transition">
+          <td class="px-4 py-3 font-mono text-slate-500">${item.time}</td>
+          <td class="px-4 py-3 font-semibold text-slate-900">${item.title}</td>
+          <td class="px-4 py-3 text-center font-bold text-emerald-700 bg-emerald-50/50">${item.yes}</td>
+          <td class="px-4 py-3 text-center font-bold text-rose-700 bg-rose-50/50">${item.no}</td>
+          <td class="px-4 py-3 text-center font-bold text-amber-700 bg-amber-50/50">${item.abs}</td>
+          <td class="px-4 py-3 text-center font-black text-slate-900">${item.total}</td>
+        </tr>
+      `).join('');
+    }
+
+    function clearHistory() {
+      if (confirm("¿Estás seguro de que deseas borrar el historial de esta sesión?")) {
+        historyLogs = [];
+        localStorage.removeItem('asamblea_history_logs');
+        renderHistory();
+        broadcastState({ type: 'SYNC_HISTORY', history: historyLogs });
+      }
+    }
+
+    function exportToExcel() {
+      if (historyLogs.length === 0) return alert("No hay datos en el historial para exportar.");
+      const wsData = [
+        ["Hora", "Punto Votado", "SÍ", "NO", "ABSTENCIÓN", "TOTAL"],
+        ...historyLogs.map(i => [i.time, i.title, i.yes, i.no, i.abs, i.total])
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Asamblea_Resultados");
+      XLSX.writeFile(wb, `Acta_Asamblea_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+
+    function exportToPDF() {
+      if (historyLogs.length === 0) return alert("No hay datos en el historial para exportar.");
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      doc.setFontSize(16);
+      doc.text("Acta de Resultados - Votaciones de Asamblea", 14, 20);
+      doc.setFontSize(10);
+      doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 28);
+
+      const tableRows = historyLogs.map(i => [i.time, i.title, i.yes, i.no, i.abs, i.total]);
+      doc.autoTable({
+        startY: 35,
+        head: [["Hora", "Punto Votado", "SÍ", "NO", "ABSTENCIÓN", "TOTAL"]],
+        body: tableRows,
+        theme: 'striped',
+        headStyles: { fillColor: [79, 70, 229] }
+      });
+
+      doc.save(`Acta_Asamblea_${new Date().toISOString().slice(0,10)}.pdf`);
     }
 
     function initCharts() {
@@ -613,312 +872,10 @@
           plugins: { legend: { display: false } },
           scales: {
             y: { beginAtZero: true, ticks: { precision: 0, color: '#64748b', font: { size: 14 } }, grid: { color: '#e2e8f0' } },
-            x: { ticks: { color: '#1e293b', font: { size: 16, weight: 'bold' } }, grid: { display: false } }
+            x: { ticks: { color: '#334155', font: { weight: 'bold', size: 14 } }, grid: { display: false } }
           }
         }
       });
-    }
-
-    function updateUI() {
-      let counts = { yes: 0, no: 0, abstain: 0 };
-      Object.values(pollState.votes).forEach(c => {
-        if (counts[c] !== undefined) counts[c]++;
-      });
-      const total = counts.yes + counts.no + counts.abstain;
-
-      if (document.activeElement !== document.getElementById('pollTitleInput')) {
-        document.getElementById('pollTitleInput').value = pollState.title;
-      }
-
-      document.getElementById('countYes').innerText = counts.yes;
-      document.getElementById('countNo').innerText = counts.no;
-      document.getElementById('countAbs').innerText = counts.abstain;
-      document.getElementById('totalVotesCount').innerText = total;
-
-      const statusBadge = document.getElementById('statusBadge');
-      const statusText = document.getElementById('statusText');
-      const btnTogglePollText = document.getElementById('btnTogglePollText');
-
-      if (pollState.isOpen) {
-        statusBadge.className = "flex items-center space-x-2 text-xs font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200";
-        statusText.innerText = "Votación Abierta";
-        btnTogglePollText.innerText = "Cerrar Votación";
-      } else {
-        statusBadge.className = "flex items-center space-x-2 text-xs font-semibold px-3 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200";
-        statusText.innerText = "Votación Cerrada";
-        btnTogglePollText.innerText = "Reabrir Votación";
-      }
-
-      if (chartInstance) {
-        chartInstance.data.datasets[0].data = [counts.yes, counts.no, counts.abstain];
-        chartInstance.update();
-      }
-
-      // VISTA PROYECCIÓN
-      document.getElementById('projPollTitle').innerText = pollState.title.trim() !== '' ? pollState.title : 'Esperando propuesta...';
-      document.getElementById('projCountYes').innerText = counts.yes;
-      document.getElementById('projCountNo').innerText = counts.no;
-      document.getElementById('projCountAbs').innerText = counts.abstain;
-      document.getElementById('projTotalVotesCount').innerText = total;
-
-      const projStatusBadge = document.getElementById('projStatusBadge');
-      const projStatusText = document.getElementById('projStatusText');
-      if (pollState.isOpen) {
-        projStatusBadge.className = "flex items-center space-x-2 text-sm font-bold px-4 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200";
-        projStatusText.innerText = "Votación Abierta";
-      } else {
-        projStatusBadge.className = "flex items-center space-x-2 text-sm font-bold px-4 py-1.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200";
-        projStatusText.innerText = "Votación Cerrada";
-      }
-
-      if (projChartInstance) {
-        projChartInstance.data.datasets[0].data = [counts.yes, counts.no, counts.abstain];
-        projChartInstance.update();
-      }
-
-      // VISTA VOTANTE
-      const voterTitleElement = document.getElementById('voterPollTitle');
-      if (voterTitleElement) {
-        voterTitleElement.innerText = pollState.title.trim() !== '' ? pollState.title : 'Esperando punto a votar...';
-      }
-
-      const voterStatusBadge = document.getElementById('voterStatusBadge');
-      const voterStatusText = document.getElementById('voterStatusText');
-      const btnContainer = document.getElementById('votingButtonsContainer');
-      const closedNotice = document.getElementById('voterClosedNotice');
-
-      if (pollState.isOpen) {
-        voterStatusBadge.className = "inline-flex items-center space-x-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200";
-        voterStatusText.innerText = "Votación Abierta";
-        btnContainer.classList.remove('hidden');
-        closedNotice.classList.add('hidden');
-      } else {
-        voterStatusBadge.className = "inline-flex items-center space-x-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200";
-        voterStatusText.innerText = "Votación Cerrada";
-        btnContainer.classList.add('hidden');
-        closedNotice.classList.remove('hidden');
-      }
-
-      const myChoice = pollState.votes[voterId] || null;
-      const alertBox = document.getElementById('voterChoiceAlert');
-      const alertText = document.getElementById('voterChoiceText');
-
-      if (myChoice) {
-        alertBox.classList.remove('hidden');
-        alertText.innerText = myChoice === 'yes' ? 'SÍ' : (myChoice === 'no' ? 'NO' : 'ABSTENCIÓN');
-      } else {
-        alertBox.classList.add('hidden');
-      }
-    }
-
-    function castVote(choice) {
-      if (!pollState.isOpen) return;
-
-      pollState.votes[voterId] = choice;
-      updateUI();
-
-      // Transmitir inmediatamente al secretario y proyector
-      broadcastState({
-        type: 'CAST_VOTE',
-        pollId: pollState.id,
-        voterId: voterId,
-        choice: choice
-      });
-    }
-
-    function applyPollTitle() {
-      const inputVal = document.getElementById('pollTitleInput').value.trim();
-      pollState.title = inputVal;
-      pollState.id = Date.now().toString();
-      pollState.votes = {};
-      pollState.isOpen = true;
-
-      updateUI();
-      updateQR();
-      broadcastState({ type: 'SYNC_STATE', state: pollState });
-    }
-
-    function togglePollStatus() {
-      pollState.isOpen = !pollState.isOpen;
-      updateUI();
-      broadcastState({ type: 'SYNC_STATE', state: pollState });
-    }
-
-    function resetPoll() {
-      let counts = { yes: 0, no: 0, abstain: 0 };
-      Object.values(pollState.votes).forEach(c => {
-        if (counts[c] !== undefined) counts[c]++;
-      });
-      const total = counts.yes + counts.no + counts.abstain;
-
-      // Guardar en el historial si hubo votos o título
-      if (total > 0 || pollState.title.trim() !== '') {
-        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        historyLogs.unshift({
-          time: timeStr,
-          title: pollState.title || 'Propuesta sin título',
-          yes: counts.yes,
-          no: counts.no,
-          abstain: counts.abstain,
-          total: total
-        });
-
-        localStorage.setItem('asamblea_history_logs', JSON.stringify(historyLogs));
-        renderHistory();
-
-        broadcastState({ type: 'SYNC_HISTORY', history: historyLogs });
-      }
-
-      // Reiniciar estado para la siguiente votación
-      pollState = {
-        id: Date.now().toString(),
-        title: '',
-        isOpen: true,
-        votes: {}
-      };
-
-      document.getElementById('pollTitleInput').value = '';
-      updateUI();
-      updateQR();
-      broadcastState({ type: 'SYNC_STATE', state: pollState });
-    }
-
-    function renderHistory() {
-      const tbody = document.getElementById('historyTableBody');
-      tbody.innerHTML = '';
-
-      if (historyLogs.length === 0) {
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="6" class="px-4 py-6 text-center text-slate-400 italic">
-              Aún no se ha guardado ninguna votación en esta sesión.
-            </td>
-          </tr>`;
-        return;
-      }
-
-      historyLogs.forEach(log => {
-        const tr = document.createElement('tr');
-        tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
-        tr.innerHTML = `
-          <td class="px-4 py-3 font-mono text-slate-500">${log.time}</td>
-          <td class="px-4 py-3 font-semibold text-slate-800">${log.title}</td>
-          <td class="px-4 py-3 text-center text-emerald-700 font-bold">${log.yes}</td>
-          <td class="px-4 py-3 text-center text-rose-700 font-bold">${log.no}</td>
-          <td class="px-4 py-3 text-center text-amber-700 font-bold">${log.abstain}</td>
-          <td class="px-4 py-3 text-center font-extrabold text-slate-900">${log.total}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function clearHistory() {
-      if (confirm("¿Estás seguro de que deseas borrar todo el historial de votaciones guardado?")) {
-        historyLogs = [];
-        localStorage.removeItem('asamblea_history_logs');
-        renderHistory();
-        broadcastState({ type: 'SYNC_HISTORY', history: historyLogs });
-      }
-    }
-
-    function exportToExcel() {
-      if (historyLogs.length === 0) {
-        alert("No hay registros en el historial para exportar.");
-        return;
-      }
-
-      const excelData = historyLogs.map(item => ({
-        'Hora': item.time,
-        'Punto Votado': item.title || 'Sin título',
-        'Votos SÍ': item.yes,
-        'Votos NO': item.no,
-        'Abstenciones': item.abstain,
-        'Total Votos': item.total
-      }));
-
-      const worksheet = XLSX.utils.json_to_sheet(excelData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Votaciones_Asamblea");
-
-      const dateStr = new Date().toISOString().slice(0, 10);
-      XLSX.writeFile(workbook, `Votaciones_Asamblea_${dateStr}.xlsx`);
-    }
-
-    function exportToPDF() {
-      if (historyLogs.length === 0) {
-        alert("No hay registros en el historial para exportar.");
-        return;
-      }
-
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-
-      const dateStr = new Date().toLocaleDateString();
-      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-      doc.setFontSize(18);
-      doc.setFont("helvetica", "bold");
-      doc.text("Acta Resumen de Votaciones", 14, 20);
-
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(100);
-      doc.text(`Fecha: ${dateStr} - Hora: ${timeStr}`, 14, 28);
-      doc.text("Sistema Digital de Asamblea", 14, 34);
-
-      const tableRows = historyLogs.map(item => [
-        item.time,
-        item.title || 'Sin título',
-        item.yes,
-        item.no,
-        item.abstain,
-        item.total
-      ]);
-
-      doc.autoTable({
-        startY: 40,
-        head: [['Hora', 'Punto Votado', 'SÍ', 'NO', 'Abstención', 'Total']],
-        body: tableRows,
-        theme: 'striped',
-        headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold' },
-        columnStyles: {
-          0: { cellWidth: 25 },
-          1: { cellWidth: 'auto' },
-          2: { halign: 'center', fontStyle: 'bold' },
-          3: { halign: 'center', fontStyle: 'bold' },
-          4: { halign: 'center', fontStyle: 'bold' },
-          5: { halign: 'center', fontStyle: 'bold' }
-        }
-      });
-
-      doc.save(`Acta_Votaciones_Asamblea_${dateStr.replace(/\//g, '-')}.pdf`);
-    }
-
-    function toggleConfigModal() {
-      const modal = document.getElementById('configModal');
-      modal.classList.toggle('hidden');
-
-      if (!modal.classList.contains('hidden')) {
-        document.getElementById('supabaseUrlInput').value = localStorage.getItem('supabase_url') || '';
-        document.getElementById('supabaseKeyInput').value = localStorage.getItem('supabase_key') || '';
-      }
-    }
-
-    function saveSupabaseConfig() {
-      const url = document.getElementById('supabaseUrlInput').value.trim();
-      const key = document.getElementById('supabaseKeyInput').value.trim();
-
-      if (url && key) {
-        localStorage.setItem('supabase_url', url);
-        localStorage.setItem('supabase_key', key);
-        alert("Configuración guardada. La página se recargará para conectar Supabase.");
-        window.location.reload();
-      } else {
-        localStorage.removeItem('supabase_url');
-        localStorage.removeItem('supabase_key');
-        alert("Configuración borrada. La aplicación usará el modo local.");
-        toggleConfigModal();
-      }
     }
   </script>
 </body>
