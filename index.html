@@ -396,7 +396,7 @@
     Votación Digital para Asambleas &copy; 2026
   </footer>
 
-  <!-- SCRIPT PRINCIPAL CORREGIDO -->
+  <!-- SCRIPT PRINCIPAL CON AUTO-CONFIGURACIÓN VÍA QR -->
   <script>
     const DEFAULT_SUPABASE_URL = "https://uoovpgixjqvxvsuwmboq.supabase.co";
     const DEFAULT_SUPABASE_KEY = "sb_publishable_65EqGtk2nlDeTH_4dLdU3W_bO6oVWMk";
@@ -427,6 +427,14 @@
     window.addEventListener('load', () => {
       const urlParams = new URLSearchParams(window.location.search);
       
+      // AUTO-CAPTURA: Guardar credenciales si vienen en la URL del QR
+      const paramUrl = urlParams.get('sUrl');
+      const paramKey = urlParams.get('sKey');
+      if (paramUrl && paramKey) {
+        localStorage.setItem('supabase_url', decodeURIComponent(paramUrl));
+        localStorage.setItem('supabase_key', decodeURIComponent(paramKey));
+      }
+
       const urlRole = urlParams.get('role');
       const urlPollId = urlParams.get('poll');
       const urlTitle = urlParams.get('title');
@@ -485,6 +493,7 @@
         localStorage.setItem('supabase_url', url);
         localStorage.setItem('supabase_key', key);
         initCommunication();
+        updateQR();
         toggleConfigModal();
         alert("¡Configuración de Supabase guardada y conectada!");
       }
@@ -545,6 +554,8 @@
             .subscribe();
 
           fetchVotesFromSupabase();
+          // Respaldo periódico para consultar la base de datos
+          setInterval(fetchVotesFromSupabase, 3000);
         } catch (e) {
           console.error("Error al conectar Supabase:", e);
         }
@@ -728,10 +739,15 @@
       }
     }
 
+    // FUNCIÓN ACTUALIZADA: Genera el QR con la URL y la Key incrustadas
     function updateQR() {
       const baseUrl = window.location.origin + window.location.pathname;
       const encodedTitle = encodeURIComponent(pollState.title || '');
-      const voterUrl = `${baseUrl}?role=voter&poll=${pollState.id}&title=${encodedTitle}`;
+      
+      const savedUrl = localStorage.getItem('supabase_url') || DEFAULT_SUPABASE_URL;
+      const savedKey = localStorage.getItem('supabase_key') || DEFAULT_SUPABASE_KEY;
+
+      const voterUrl = `${baseUrl}?role=voter&poll=${pollState.id}&title=${encodedTitle}&sUrl=${encodeURIComponent(savedUrl)}&sKey=${encodeURIComponent(savedKey)}`;
       
       const qrTextElement = document.getElementById('qrUrlText');
       const qrContainer = document.getElementById('qrcode');
