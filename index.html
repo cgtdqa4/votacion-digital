@@ -115,13 +115,12 @@
 <script>
 'use strict';
 
-// Configuración de Supabase (con comillas obligatorias)
+// ⚠️ CLAVES CON COMILLAS OBLIGATORIAS
 const SUPABASE_URL = 'https://uoovpgixjqvxvsuwmboq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_65EqGtk2nlDeTH_4dLdU3W_bO6oVWMk';
 
 const params = new URLSearchParams(location.search);
 
-// AUTO-CONFIGURACIÓN: Si el QR trae las credenciales, las guardamos en el navegador del móvil
 const paramUrl = params.get('sUrl');
 const paramKey = params.get('sKey');
 if (paramUrl && paramKey) {
@@ -252,7 +251,6 @@ function render() {
   }
 }
 
-// FUNCIÓN CORREGIDA: Incrusta las credenciales en el enlace del QR
 function updateQr() {
   const qr = $('qr');
   const pQr = $('pQr');
@@ -512,16 +510,13 @@ async function start() {
   initCharts();
   setRole(role);
 
-  // Si hay un ID de votación en la URL (modo votante o proyección), cargamos
   if (pollId) {
     await subscribeToPoll(pollId);
     await loadPoll(pollId);
   } else {
-    // Si es el secretario y entra limpio, pasamos la barra a verde de inmediato
     setConnection('Conectado a Supabase. Listo para crear votación.', true);
   }
 
-  // Respaldo periódico
   refreshTimer = setInterval(async () => {
     if (poll.id) {
       await loadPoll(poll.id);
