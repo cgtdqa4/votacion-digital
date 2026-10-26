@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -116,14 +115,24 @@
 <script>
 'use strict';
 
-// Configuración pública de Supabase.
-// Utiliza únicamente la clave publishable/anon, nunca service_role.
 const SUPABASE_URL = 'https://uoovpgixjqvxvsuwmboq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_65EqGtk2nlDeTH_4dLdU3W_bO6oVWMk';
 
-const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
 const params = new URLSearchParams(location.search);
+
+// AUTO-CONFIGURACIÓN: Si el QR trae las credenciales, las guardamos en el navegador del móvil
+const paramUrl = params.get('sUrl');
+const paramKey = params.get('sKey');
+if (paramUrl && paramKey) {
+  localStorage.setItem('supabase_url', decodeURIComponent(paramUrl));
+  localStorage.setItem('supabase_key', decodeURIComponent(paramKey));
+}
+
+const activeUrl = localStorage.getItem('supabase_url') || SUPABASE_URL;
+const activeKey = localStorage.getItem('supabase_key') || SUPABASE_KEY;
+
+const db = window.supabase.createClient(activeUrl, activeKey);
+
 let role = params.get('role') || 'secretary';
 let pollId = params.get('poll') || null;
 let poll = { id: null, title: '', is_open: false };
@@ -242,6 +251,7 @@ function render() {
   }
 }
 
+// FUNCIÓN CORREGIDA: Incrusta las credenciales en el enlace del QR
 function updateQr() {
   const qr = $('qr');
   const pQr = $('pQr');
@@ -257,6 +267,8 @@ function updateQr() {
   const url = new URL(location.pathname, location.origin);
   url.searchParams.set('role', 'voter');
   url.searchParams.set('poll', poll.id);
+  url.searchParams.set('sUrl', activeUrl);
+  url.searchParams.set('sKey', activeKey);
 
   const voterUrl = url.href;
   link.href = voterUrl;
@@ -327,7 +339,6 @@ async function loadVotes(id) {
       return;
     }
 
-    // No mezclar resultados de dos puntos diferentes.
     if (poll.id !== id) return;
 
     const nextVotes = {};
@@ -416,7 +427,6 @@ async function castVote(choice) {
 
   $('voterMessage').textContent = 'Guardando voto...';
 
-  // Verifica el estado compartido antes de guardar.
   const { data: latest, error: pollError } = await db
     .from('polls')
     .select('id,is_open')
@@ -509,12 +519,11 @@ async function start() {
       'El QR no contiene el identificador de la votación.';
   }
 
-  // Respaldo por si una notificación Realtime se pierde.
   refreshTimer = setInterval(async () => {
     if (poll.id) {
       await loadPoll(poll.id);
     }
-  }, 5000);
+  }, 3000);
 }
 
 window.addEventListener('beforeunload', () => {
