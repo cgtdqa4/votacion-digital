@@ -507,16 +507,17 @@ async function subscribeToPoll(id) {
     });
 }
 
-async function start() {
+aasync function start() {
   initCharts();
   setRole(role);
 
+  // Si estamos en modo votante o tenemos ID, cargamos
   if (pollId) {
     await subscribeToPoll(pollId);
     await loadPoll(pollId);
-  } else if (role === 'voter') {
-    $('voterMessage').textContent =
-      'El QR no contiene el identificador de la votación.';
+  } else {
+    // Si es el secretario y entra limpio, marcamos conexión activa de inmediato
+    setConnection('Conectado a Supabase. Listo para crear votación.', true);
   }
 
   refreshTimer = setInterval(async () => {
