@@ -507,19 +507,20 @@ async function subscribeToPoll(id) {
     });
 }
 
-aasync function start() {
+async function start() {
   initCharts();
   setRole(role);
 
-  // Si estamos en modo votante o tenemos ID, cargamos
+  // Si hay un ID de votación en la URL (modo votante o proyección), cargamos
   if (pollId) {
     await subscribeToPoll(pollId);
     await loadPoll(pollId);
   } else {
-    // Si es el secretario y entra limpio, marcamos conexión activa de inmediato
+    // Si es el secretario y entra limpio, pasamos la barra a verde de inmediato
     setConnection('Conectado a Supabase. Listo para crear votación.', true);
   }
 
+  // Respaldo periódico
   refreshTimer = setInterval(async () => {
     if (poll.id) {
       await loadPoll(poll.id);
