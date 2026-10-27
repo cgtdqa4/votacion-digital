@@ -122,7 +122,7 @@
               <th class="p-3 text-center text-emerald-700">SÍ</th>
               <th class="p-3 text-center text-rose-700">NO</th>
               <th class="p-3 text-center text-amber-700">Abs.</th>
-              <th class="p-3 text-center">Total</th>
+              <th class="p-3 text-center">Resultado Ganador</th>
             </tr>
           </thead>
           <tbody id="historyTableBody">
@@ -251,7 +251,6 @@
 
   const $ = id => document.getElementById(id);
 
-  // Recuperar título y fecha de la asamblea guardados en el navegador
   const savedAssemblyTitle = localStorage.getItem('asamblea_general_title') || '';
   const savedAssemblyDate = localStorage.getItem('asamblea_general_date') || new Date().toISOString().split('T')[0];
 
@@ -264,7 +263,6 @@
     poll.assembly_date = savedAssemblyDate;
   }
 
-  // Guardar automáticamente al escribir en título o cambiar fecha
   document.addEventListener('input', (e) => {
     if (e.target && e.target.id === 'assemblyTitleInput') {
       const val = e.target.value;
@@ -381,6 +379,34 @@
       const isSelected = item.id === poll.id;
       const rowClass = isSelected ? 'bg-indigo-50 border-l-4 border-indigo-600' : 'hover:bg-slate-50';
 
+      const yCount = item.counts?.yes || 0;
+      const nCount = item.counts?.no || 0;
+      const aCount = item.counts?.abstain || 0;
+      const totalCount = yCount + nCount + aCount;
+
+      let winnerText = "-";
+      let winnerClass = "text-slate-400 font-normal";
+
+      if (item.is_open === false && totalCount > 0) {
+        const maxVal = Math.max(yCount, nCount, aCount);
+        if (yCount === maxVal && yCount !== nCount && yCount !== aCount) {
+          winnerText = "SÍ";
+          winnerClass = "bg-emerald-100 text-emerald-900 font-black px-2 py-1 rounded-lg border border-emerald-300 inline-block";
+        } else if (nCount === maxVal && nCount !== yCount && nCount !== aCount) {
+          winnerText = "NO";
+          winnerClass = "bg-rose-100 text-rose-900 font-black px-2 py-1 rounded-lg border border-rose-300 inline-block";
+        } else if (aCount === maxVal && aCount !== yCount && aCount !== nCount) {
+          winnerText = "ABSTENCIÓN";
+          winnerClass = "bg-amber-100 text-amber-900 font-black px-2 py-1 rounded-lg border border-amber-300 inline-block";
+        } else {
+          winnerText = "EMPATE";
+          winnerClass = "bg-slate-200 text-slate-800 font-bold px-2 py-1 rounded-lg inline-block";
+        }
+      } else if (item.is_open === true) {
+        winnerText = "En curso...";
+        winnerClass = "text-indigo-600 font-semibold italic";
+      }
+
       return `
         <tr onclick="window.selectPoll('${item.id}')" class="${rowClass} border-b cursor-pointer transition">
           <td class="p-3 font-mono text-slate-500">${timeStr}</td>
@@ -390,10 +416,10 @@
               ${item.is_open ? 'Abierta' : 'Cerrada'}
             </span>
           </td>
-          <td class="p-3 text-center font-bold text-emerald-700">${item.counts?.yes || 0}</td>
-          <td class="p-3 text-center font-bold text-rose-700">${item.counts?.no || 0}</td>
-          <td class="p-3 text-center font-bold text-amber-700">${item.counts?.abstain || 0}</td>
-          <td class="p-3 text-center font-bold text-slate-900">${(item.counts?.yes || 0) + (item.counts?.no || 0) + (item.counts?.abstain || 0)}</td>
+          <td class="p-3 text-center font-bold text-emerald-700">${yCount}</td>
+          <td class="p-3 text-center font-bold text-rose-700">${nCount}</td>
+          <td class="p-3 text-center font-bold text-amber-700">${aCount}</td>
+          <td class="p-3 text-center"><span class="${winnerClass}">${winnerText}</span></td>
         </tr>
       `;
     }).join('');
@@ -508,7 +534,6 @@
     }
   }
 
-  // EXPORTAR A EXCEL CON TÍTULO Y FECHA
   window.exportExcel = function() {
     if (pollHistory.length === 0) return alert("No hay datos en el historial para exportar.");
 
@@ -517,16 +542,25 @@
 
     const dataToExport = pollHistory.map(item => {
       const date = item.updated_at ? new Date(item.updated_at) : new Date();
+      const y = item.counts?.yes || 0;
+      const n = item.counts?.no || 0;
+      const a = item.counts?.abstain || 0;
+      let winner = "En curso";
+      if (!item.is_open) {
+        const max = Math.max(y, n, a);
+        winner = (y === max && y !== n && y !== a) ? "SÍ" : (n === max && n !== y && n !== a) ? "NO" : (a === max && a !== y && a !== n) ? "ABSTENCIÓN" : "EMPATE";
+      }
+
       return {
         "Asamblea / Plenario": item.assembly_title || assemblyName,
         "Fecha Asamblea": item.assembly_date || assemblyDate,
         "Hora Punto": date.toLocaleTimeString(),
         "Punto del Día": item.title,
         "Estado": item.is_open ? 'Abierta' : 'Cerrada',
-        "Votos SÍ": item.counts?.yes || 0,
-        "Votos NO": item.counts?.no || 0,
-        "Abstenciones": item.counts?.abstain || 0,
-        "Total Votos": (item.counts?.yes || 0) + (item.counts?.no || 0) + (item.counts?.abstain || 0)
+        "Votos SÍ": y,
+        "Votos NO": n,
+        "Abstenciones": a,
+        "Resultado Ganador": winner
       };
     });
 
@@ -536,7 +570,6 @@
     XLSX.writeFile(workbook, `Acta_${Date.now()}.xlsx`);
   }
 
-  // EXPORTAR A PDF CON TÍTULO Y FECHA
   window.exportPDF = function() {
     if (pollHistory.length === 0) return alert("No hay datos en el historial para exportar.");
 
@@ -551,16 +584,27 @@
     docPdf.setFontSize(10);
     docPdf.text(`Fecha: ${assemblyDate} | Emitido: ${new Date().toLocaleString()}`, 14, 28);
 
-    const tableColumn = ["Hora", "Punto del Día", "Estado", "SÍ", "NO", "Abs.", "Total"];
-    const tableRows = pollHistory.map(item => [
-      item.updated_at ? new Date(item.updated_at).toLocaleTimeString() : '-',
-      item.title,
-      item.is_open ? 'Abierta' : 'Cerrada',
-      item.counts?.yes || 0,
-      item.counts?.no || 0,
-      item.counts?.abstain || 0,
-      (item.counts?.yes || 0) + (item.counts?.no || 0) + (item.counts?.abstain || 0)
-    ]);
+    const tableColumn = ["Hora", "Punto del Día", "Estado", "SÍ", "NO", "Abs.", "Ganador"];
+    const tableRows = pollHistory.map(item => {
+      const y = item.counts?.yes || 0;
+      const n = item.counts?.no || 0;
+      const a = item.counts?.abstain || 0;
+      let winner = "En curso";
+      if (!item.is_open) {
+        const max = Math.max(y, n, a);
+        winner = (y === max && y !== n && y !== a) ? "SÍ" : (n === max && n !== y && n !== a) ? "NO" : (a === max && a !== y && a !== n) ? "ABSTENCIÓN" : "EMPATE";
+      }
+
+      return [
+        item.updated_at ? new Date(item.updated_at).toLocaleTimeString() : '-',
+        item.title,
+        item.is_open ? 'Abierta' : 'Cerrada',
+        y,
+        n,
+        a,
+        winner
+      ];
+    });
 
     docPdf.autoTable({
       head: [tableColumn],
@@ -639,6 +683,7 @@
         const docSnap = await getDoc(doc(db, "polls", pollId));
         if (docSnap.exists()) {
           poll = { id: docSnap.id, ...docSnap.data() };
+          if ($('titleInput')) $('titleInput<b>id</b>')) $('titleInput').value = poll.title;
           if ($('titleInput')) $('titleInput').value = poll.title;
           if (poll.assembly_title && $('assemblyTitleInput')) {
             $('assemblyTitleInput').value = poll.assembly_title;
