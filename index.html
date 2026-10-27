@@ -3,10 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Votación Digital - Asamblea</title>
+  <title>Votación Digital - Asamblea (Firebase)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     body { font-family: system-ui, sans-serif; }
     button:disabled { opacity: .5; cursor: not-allowed; }
@@ -27,8 +26,8 @@
 
 <main class="max-w-6xl mx-auto p-4 space-y-5">
 
-  <div id="connection" class="rounded-lg bg-amber-100 text-amber-900 p-3 text-sm">
-    Conectando con Supabase...
+  <div id="connection" class="rounded-lg bg-emerald-100 text-emerald-900 p-3 text-sm">
+    Conectado a Firebase Realtime.
   </div>
 
   <section id="secretary" class="space-y-5">
@@ -69,7 +68,6 @@
       <h2 class="font-bold mb-4">Resultados en tiempo real</h2>
       <p>Total de votos: <strong id="total">0</strong></p>
       <div class="h-72"><canvas id="chart"></canvas></div>
-      <p id="message" class="text-sm mt-3 text-slate-500"></p>
     </div>
   </section>
 
@@ -77,7 +75,7 @@
     <div class="bg-white rounded-2xl p-6 text-center shadow-sm">
       <p class="text-indigo-600 font-bold uppercase text-sm">Punto en votación</p>
       <h2 id="projectionTitle" class="text-3xl font-black my-5">Esperando votación...</h2>
-      <p id="projectionStatus" class="font-semibold mb-5">Conectando...</p>
+      <p id="projectionStatus" class="font-semibold mb-5">Conectado...</p>
       <div class="grid grid-cols-3 gap-3">
         <div class="bg-emerald-50 rounded-xl p-4">
           <p>SÍ</p><strong id="pYes" class="text-4xl">0</strong>
@@ -112,427 +110,204 @@
 
 </main>
 
-<script>
-'use strict';
+<!-- SDK Modular de Firebase (Firestore) -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// ⚠️ CLAVES CON COMILLAS OBLIGATORIAS
-const SUPABASE_URL = 'https://uoovpgixjqvxvsuwmboq.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_65EqGtk2nlDeTH_4dLdU3W_bO6oVWMk';
-
-const params = new URLSearchParams(location.search);
-
-const paramUrl = params.get('sUrl');
-const paramKey = params.get('sKey');
-if (paramUrl && paramKey) {
-  localStorage.setItem('supabase_url', decodeURIComponent(paramUrl));
-  localStorage.setItem('supabase_key', decodeURIComponent(paramKey));
-}
-
-const activeUrl = localStorage.getItem('supabase_url') || SUPABASE_URL;
-const activeKey = localStorage.getItem('supabase_key') || SUPABASE_KEY;
-
-const db = window.supabase.createClient(activeUrl, activeKey);
-
-let role = params.get('role') || 'secretary';
-let pollId = params.get('poll') || null;
-let poll = { id: null, title: '', is_open: false };
-let votes = {};
-let channel = null;
-let loadingVotes = false;
-let chart = null;
-let projectionChart = null;
-let refreshTimer = null;
-let voterId = localStorage.getItem('asamblea_voter_id');
-
-if (!voterId) {
-  voterId = crypto.randomUUID
-    ? crypto.randomUUID()
-    : 'voter_' + Math.random().toString(36).slice(2) + Date.now();
-  localStorage.setItem('asamblea_voter_id', voterId);
-}
-
-const $ = id => document.getElementById(id);
-
-function setConnection(text, good = false) {
-  $('connection').textContent = text;
-  $('connection').className = 'rounded-lg p-3 text-sm ' +
-    (good ? 'bg-emerald-100 text-emerald-900' :
-            'bg-amber-100 text-amber-900');
-}
-
-function setRole(newRole) {
-  if (!['secretary', 'projection', 'voter'].includes(newRole)) return;
-  role = newRole;
-
-  $('header').classList.toggle('hidden', role === 'voter');
-  $('nav').classList.toggle('hidden', role === 'voter');
-  $('secretary').classList.toggle('hidden', role !== 'secretary');
-  $('projection').classList.toggle('hidden', role !== 'projection');
-  $('voter').classList.toggle('hidden', role !== 'voter');
-
-  if (role === 'voter') {
-    $('connection').classList.add('hidden');
-  } else {
-    $('connection').classList.remove('hidden');
-  }
-
-  render();
-}
-
-function initCharts() {
-  const config = {
-    type: 'bar',
-    data: {
-      labels: ['SÍ', 'NO', 'ABSTENCIÓN'],
-      datasets: [{
-        label: 'Votos',
-        data: [0, 0, 0],
-        backgroundColor: ['#059669', '#e11d48', '#d97706']
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { beginAtZero: true, ticks: { precision: 0 } }
-      }
-    }
+  // TODO: Sustituye esto con la configuración de tu proyecto en la consola de Firebase
+  const firebaseConfig = {
+    apiKey: "TU_API_KEY_DE_FIREBASE",
+    authDomain: "tu-proyecto.firebaseapp.com",
+    projectId: "tu-proyecto",
+    storageBucket: "tu-proyecto.appspot.com",
+    messagingSenderId: "...",
+    appId: "..."
   };
 
-  chart = new Chart($('chart'), structuredClone(config));
-  projectionChart = new Chart($('pChart'), structuredClone(config));
-}
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-function render() {
-  const counts = { yes: 0, no: 0, abstain: 0 };
+  const params = new URLSearchParams(location.search);
+  let role = params.get('role') || 'secretary';
+  let pollId = params.get('poll') || null;
+  let poll = { id: null, title: '', is_open: false };
+  let votes = {};
+  let unsubscribePoll = null;
+  let unsubscribeVotes = null;
+  let chart = null;
+  let projectionChart = null;
 
-  Object.values(votes).forEach(choice => {
-    if (Object.hasOwn(counts, choice)) counts[choice]++;
-  });
-
-  const total = counts.yes + counts.no + counts.abstain;
-  const title = poll.title || 'Esperando punto a votar...';
-  const status = poll.is_open ? 'Votación abierta' : 'Votación cerrada';
-
-  $('yes').textContent = counts.yes;
-  $('no').textContent = counts.no;
-  $('abstain').textContent = counts.abstain;
-  $('total').textContent = total;
-
-  $('projectionTitle').textContent = title;
-  $('projectionStatus').textContent = status;
-  $('pYes').textContent = counts.yes;
-  $('pNo').textContent = counts.no;
-  $('pAbstain').textContent = counts.abstain;
-  $('pTotal').textContent = total;
-
-  $('voterTitle').textContent = title;
-  $('voterStatus').textContent = status;
-  $('voterButtons').classList.toggle('hidden', !poll.is_open);
-
-  $('toggleButton').textContent =
-    poll.is_open ? 'Cerrar votación' : 'Abrir votación';
-  $('toggleButton').disabled = !poll.id;
-
-  $('pollIdLabel').textContent =
-    poll.id ? 'ID de la votación: ' + poll.id : 'Todavía no hay votación creada.';
-
-  if (chart) {
-    chart.data.datasets[0].data =
-      [counts.yes, counts.no, counts.abstain];
-    chart.update();
+  let voterId = localStorage.getItem('asamblea_voter_id');
+  if (!voterId) {
+    voterId = 'voter_' + Math.random().toString(36).slice(2) + Date.now();
+    localStorage.setItem('asamblea_voter_id', voterId);
   }
 
-  if (projectionChart) {
-    projectionChart.data.datasets[0].data =
-      [counts.yes, counts.no, counts.abstain];
-    projectionChart.update();
-  }
-}
+  const $ = id => document.getElementById(id);
 
-function updateQr() {
-  const qr = $('qr');
-  const pQr = $('pQr');
-  const link = $('voterLink');
+  function setRole(newRole) {
+    if (!['secretary', 'projection', 'voter'].includes(newRole)) return;
+    role = newRole;
 
-  qr.replaceChildren();
-  pQr.replaceChildren();
-  link.textContent = '';
-  link.removeAttribute('href');
+    $('header').classList.toggle('hidden', role === 'voter');
+    $('nav').classList.toggle('hidden', role === 'voter');
+    $('secretary').classList.toggle('hidden', role !== 'secretary');
+    $('projection').classList.toggle('hidden', role !== 'projection');
+    $('voter').classList.toggle('hidden', role !== 'voter');
 
-  if (!poll.id) return;
-
-  const url = new URL(location.pathname, location.origin);
-  url.searchParams.set('role', 'voter');
-  url.searchParams.set('poll', poll.id);
-  url.searchParams.set('sUrl', activeUrl);
-  url.searchParams.set('sKey', activeKey);
-
-  const voterUrl = url.href;
-  link.href = voterUrl;
-  link.textContent = voterUrl;
-
-  const imageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='
-    + encodeURIComponent(voterUrl);
-
-  const img = document.createElement('img');
-  img.src = imageUrl;
-  img.alt = 'QR para votar';
-  img.width = 220;
-  img.height = 220;
-  qr.appendChild(img);
-  pQr.appendChild(img.cloneNode());
-}
-
-async function loadPoll(id) {
-  if (!id) return;
-
-  const { data, error } = await db
-    .from('polls')
-    .select('id,title,is_open,updated_at')
-    .eq('id', id)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error leyendo votación:', error);
-    setConnection('Error leyendo la votación: ' + error.message);
-    return;
-  }
-
-  if (!data) {
     if (role === 'voter') {
-      $('voterMessage').textContent =
-        'No existe esta votación. Pide al secretario un QR actualizado.';
+      $('connection').classList.add('hidden');
+    } else {
+      $('connection').classList.remove('hidden');
     }
-    return;
-  }
-
-  poll = {
-    id: data.id,
-    title: data.title,
-    is_open: data.is_open
-  };
-  pollId = data.id;
-
-  if (role === 'secretary') $('titleInput').value = poll.title;
-
-  render();
-  updateQr();
-  await loadVotes(id);
-}
-
-async function loadVotes(id) {
-  if (!id || loadingVotes) return;
-  loadingVotes = true;
-
-  try {
-    const { data, error } = await db
-      .from('votes')
-      .select('poll_id,voter_id,choice')
-      .eq('poll_id', id);
-
-    if (error) {
-      console.error('Error leyendo votos:', error);
-      setConnection('Error leyendo votos: ' + error.message);
-      return;
-    }
-
-    if (poll.id !== id) return;
-
-    const nextVotes = {};
-    for (const row of data || []) {
-      nextVotes[row.voter_id] = row.choice;
-    }
-
-    votes = nextVotes;
     render();
-    setConnection('Conectado a Supabase. Sincronización activa.', true);
-  } finally {
-    loadingVotes = false;
-  }
-}
-
-async function createPoll() {
-  const title = $('titleInput').value.trim();
-
-  if (!title) {
-    alert('Escribe el punto que se va a votar.');
-    return;
   }
 
-  const newId = crypto.randomUUID
-    ? crypto.randomUUID()
-    : String(Date.now());
-
-  const newPoll = {
-    id: newId,
-    title,
-    is_open: true,
-    updated_at: new Date().toISOString()
-  };
-
-  const { error } = await db.from('polls').insert(newPoll);
-
-  if (error) {
-    console.error('Error creando votación:', error);
-    alert('No se pudo crear la votación: ' + error.message);
-    return;
+  function initCharts() {
+    const config = {
+      type: 'bar',
+      data: {
+        labels: ['SÍ', 'NO', 'ABSTENCIÓN'],
+        datasets: [{ data: [0, 0, 0], backgroundColor: ['#059669', '#e11d48', '#d97706'] }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    };
+    chart = new Chart($('chart'), structuredClone(config));
+    projectionChart = new Chart($('pChart'), structuredClone(config));
   }
 
-  poll = { id: newId, title, is_open: true };
-  pollId = newId;
-  votes = {};
-
-  await subscribeToPoll(newId);
-  render();
-  updateQr();
-  history.replaceState({}, '', location.pathname);
-}
-
-async function togglePoll() {
-  if (!poll.id) {
-    alert('Primero crea un punto de votación.');
-    return;
-  }
-
-  const updated = {
-    is_open: !poll.is_open,
-    updated_at: new Date().toISOString()
-  };
-
-  const { data, error } = await db
-    .from('polls')
-    .update(updated)
-    .eq('id', poll.id)
-    .select('id,title,is_open')
-    .single();
-
-  if (error) {
-    console.error('Error cambiando estado:', error);
-    alert('No se pudo cambiar el estado: ' + error.message);
-    return;
-  }
-
-  poll = data;
-  render();
-}
-
-async function castVote(choice) {
-  if (!poll.id || !poll.is_open) {
-    $('voterMessage').textContent = 'La votación no está abierta.';
-    return;
-  }
-
-  $('voterMessage').textContent = 'Guardando voto...';
-
-  const { data: latest, error: pollError } = await db
-    .from('polls')
-    .select('id,is_open')
-    .eq('id', poll.id)
-    .maybeSingle();
-
-  if (pollError || !latest || !latest.is_open) {
-    $('voterMessage').textContent =
-      'No se pudo confirmar que la votación siga abierta.';
-    if (latest) {
-      poll.is_open = latest.is_open;
-      render();
-    }
-    return;
-  }
-
-  const id = poll.id;
-
-  const { error } = await db
-    .from('votes')
-    .upsert({
-      poll_id: id,
-      voter_id: voterId,
-      choice,
-      created_at: new Date().toISOString()
-    }, {
-      onConflict: 'poll_id,voter_id'
+  function render() {
+    const counts = { yes: 0, no: 0, abstain: 0 };
+    Object.values(votes).forEach(choice => {
+      if (Object.hasOwn(counts, choice)) counts[choice]++;
     });
 
-  if (error) {
-    console.error('Error guardando voto:', error);
-    $('voterMessage').textContent = 'Error guardando el voto: ' + error.message;
-    return;
+    const total = counts.yes + counts.no + counts.abstain;
+    const title = poll.title || 'Esperando punto a votar...';
+    const status = poll.is_open ? 'Votación abierta' : 'Votación cerrada';
+
+    $('yes').textContent = counts.yes;
+    $('no').textContent = counts.no;
+    $('abstain').textContent = counts.abstain;
+    $('total').textContent = total;
+
+    $('projectionTitle').textContent = title;
+    $('projectionStatus').textContent = status;
+    $('pYes').textContent = counts.yes;
+    $('pNo').textContent = counts.no;
+    $('pAbstain').textContent = counts.abstain;
+    $('pTotal').textContent = total;
+
+    $('voterTitle').textContent = title;
+    $('voterStatus').textContent = status;
+    $('voterButtons').classList.toggle('hidden', !poll.is_open);
+
+    $('toggleButton').textContent = poll.is_open ? 'Cerrar votación' : 'Abrir votación';
+    $('toggleButton').disabled = !poll.id;
+    $('pollIdLabel').textContent = poll.id ? 'ID de la votación: ' + poll.id : 'Todavía no hay votación creada.';
+
+    if (chart) { chart.data.datasets[0].data = [counts.yes, counts.no, counts.abstain]; chart.update(); }
+    if (projectionChart) { projectionChart.data.datasets[0].data = [counts.yes, counts.no, counts.abstain]; projectionChart.update(); }
   }
 
-  $('voterMessage').textContent =
-    'Voto guardado: ' +
-    (choice === 'yes' ? 'SÍ' :
-     choice === 'no' ? 'NO' : 'ABSTENCIÓN') +
-    '. Puedes cambiarlo mientras siga abierta la votación.';
+  function updateQr() {
+    const qr = $('qr'), pQr = $('pQr'), link = $('voterLink');
+    qr.replaceChildren(); pQr.replaceChildren(); link.textContent = ''; link.removeAttribute('href');
+    if (!poll.id) return;
 
-  await loadVotes(id);
-}
+    const url = new URL(location.pathname, location.origin);
+    url.searchParams.set('role', 'voter');
+    url.searchParams.set('poll', poll.id);
 
-async function subscribeToPoll(id) {
-  if (channel) {
-    await db.removeChannel(channel);
-    channel = null;
+    const voterUrl = url.href;
+    link.href = voterUrl; link.textContent = voterUrl;
+    const imageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(voterUrl);
+    
+    const img = document.createElement('img');
+    img.src = imageUrl; img.width = 220; img.height = 220;
+    qr.appendChild(img); pQr.appendChild(img.cloneNode());
   }
 
-  channel = db.channel('assembly-' + id)
-    .on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'votes',
-      filter: 'poll_id=eq.' + id
-    }, async () => {
-      await loadVotes(id);
-    })
-    .on('postgres_changes', {
-      event: '*',
-      schema: 'public',
-      table: 'polls',
-      filter: 'id=eq.' + id
-    }, async () => {
-      await loadPoll(id);
-    })
-    .subscribe(status => {
-      console.log('Realtime:', status);
-      if (status === 'SUBSCRIBED') {
-        setConnection('Conectado a Supabase. Realtime activo.', true);
-        loadPoll(id);
-      } else if (status === 'CHANNEL_ERROR' ||
-                 status === 'TIMED_OUT' ||
-                 status === 'CLOSED') {
-        setConnection('Realtime desconectado: ' + status);
+  window.createPoll = async function() {
+    const title = $('titleInput').value.trim();
+    if (!title) return alert('Escribe el punto que se va a votar.');
+
+    const newId = 'poll_' + Date.now();
+    await setDoc(doc(db, "polls", newId), {
+      title, is_open: true, updated_at: new Date().toISOString()
+    });
+
+    poll = { id: newId, title, is_open: true };
+    pollId = newId;
+    votes = {};
+    listenToPoll(newId);
+    render();
+    updateQr();
+    history.replaceState({}, '', location.pathname + '?poll=' + newId);
+  }
+
+  window.togglePoll = async function() {
+    if (!poll.id) return;
+    const newStatus = !poll.is_open;
+    await updateDoc(doc(db, "polls", poll.id), { is_open: newStatus });
+  }
+
+  window.castVote = async function(choice) {
+    if (!poll.id || !poll.is_open) return;
+    $('voterMessage').textContent = 'Guardando voto...';
+
+    const voteDocId = poll.id + '_' + voterId;
+    await setDoc(doc(db, "votes", voteDocId), {
+      poll_id: poll.id, voter_id: voterId, choice, created_at: new Date().toISOString()
+    });
+
+    $('voterMessage').textContent = 'Voto guardado: ' + (choice === 'yes' ? 'SÍ' : choice === 'no' ? 'NO' : 'ABSTENCIÓN');
+  }
+
+  function listenToPoll(id) {
+    if (unsubscribePoll) unsubscribePoll();
+    if (unsubscribeVotes) unsubscribeVotes();
+
+    // Escuchar cambios en la votación en tiempo real
+    unsubscribePoll = onSnapshot(doc(db, "polls", id), (docSnap) => {
+      if (docSnap.exists()) {
+        poll = { id: docSnap.id, ...docSnap.data() };
+        render();
       }
     });
-}
 
-async function start() {
-  initCharts();
-  setRole(role);
-
-  if (pollId) {
-    await subscribeToPoll(pollId);
-    await loadPoll(pollId);
-  } else {
-    setConnection('Conectado a Supabase. Listo para crear votación.', true);
+    // Escuchar votos en tiempo real de este punto
+    const q = query(collection(db, "votes"), where("poll_id", "==", id));
+    unsubscribeVotes = onSnapshot(q, (snapshot) => {
+      votes = {};
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        votes[data.voter_id] = data.choice;
+      });
+      render();
+    });
   }
 
-  refreshTimer = setInterval(async () => {
-    if (poll.id) {
-      await loadPoll(poll.id);
+  async function start() {
+    initCharts();
+    setRole(role);
+    if (pollId) {
+      const docSnap = await getDoc(doc(db, "polls", pollId));
+      if (docSnap.exists()) {
+        poll = { id: docSnap.id, ...docSnap.data() };
+        if (role === 'secretary') $('titleInput').value = poll.title;
+        updateQr();
+      }
+      listenToPoll(pollId);
     }
-  }, 3000);
-}
+  }
 
-window.addEventListener('beforeunload', () => {
-  if (refreshTimer) clearInterval(refreshTimer);
-  if (channel) db.removeChannel(channel);
-});
-
-start().catch(error => {
-  console.error('Error iniciando la aplicación:', error);
-  setConnection('No se pudo iniciar la aplicación: ' + error.message);
-});
+  start();
 </script>
 </body>
 </html>
