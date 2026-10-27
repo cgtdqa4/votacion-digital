@@ -17,13 +17,14 @@
 </head>
 <body class="min-h-screen bg-slate-100 text-slate-800">
 
-<!-- Cabecera -->
+<!-- Cabecera con las 3 pestañas para cambiar libremente en PC -->
 <header id="header" class="bg-white border-b p-4 sticky top-0 z-50 shadow-sm">
   <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
     <h1 class="font-bold text-xl text-slate-900">Votación Digital</h1>
     <nav id="nav" class="flex flex-wrap gap-2">
       <button onclick="window.setRole('secretary')" id="tabSecretary" class="rounded-lg bg-indigo-600 text-white px-3 py-2 font-semibold text-xs">Secretario</button>
       <button onclick="window.setRole('projection')" id="tabProjection" class="rounded-lg bg-slate-200 text-slate-700 px-3 py-2 font-semibold text-xs">Proyección (Pantalla)</button>
+      <button onclick="window.setRole('voter')" id="tabVoter" class="rounded-lg bg-slate-200 text-slate-700 px-3 py-2 font-semibold text-xs">Votante</button>
     </nav>
   </div>
 </header>
@@ -51,15 +52,12 @@
         </button>
       </div>
       
-      <p id="pollIdLabel" class="text-xs text-slate-500 break-all font-mono">Todavía no hay votación creada.</p>
-      
-      <!-- Contenedor del Código QR -->
+      <!-- Contenedor del Código QR (Sin enlace de texto debajo) -->
       <div class="flex flex-col items-center border border-slate-200 rounded-xl p-4 gap-2 bg-slate-50">
-        <h3 class="font-semibold text-slate-700 text-sm">QR para escanear y votar (Sin login)</h3>
+        <h3 class="font-semibold text-slate-700 text-sm">QR para escanear y votar</h3>
         <div id="qr" class="bg-white p-3 rounded-xl shadow-sm min-h-[180px] flex items-center justify-center">
           <p class="text-xs text-slate-400 italic">Genera un punto para ver el QR</p>
         </div>
-        <a id="voterLink" class="text-indigo-600 text-xs underline break-all text-center max-w-full" target="_blank" rel="noopener"></a>
       </div>
     </div>
 
@@ -87,7 +85,14 @@
 
     <!-- HISTORIAL DE VOTACIONES -->
     <div class="bg-white rounded-2xl p-5 shadow-sm space-y-4">
-      <h2 class="font-bold text-slate-800 text-sm">Historial de puntos votados en la sesión</h2>
+      <div class="flex flex-wrap justify-between items-center gap-2">
+        <h2 class="font-bold text-slate-800 text-sm">Historial de puntos votados en la sesión</h2>
+        <!-- Botón para borrar el historial -->
+        <button onclick="window.clearHistory()" class="rounded-lg bg-slate-100 hover:bg-rose-50 text-rose-600 border border-rose-200 px-3 py-1.5 font-bold text-xs transition">
+          🗑️ Borrar Historial
+        </button>
+      </div>
+
       <div class="overflow-x-auto">
         <table class="w-full text-xs text-left text-slate-600 border-collapse">
           <thead class="bg-slate-50 text-slate-700 font-bold uppercase border-b">
@@ -192,7 +197,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCgS8nTPtBGCgAnCCpSjL8HByJLEWXP-TU",
@@ -239,11 +244,7 @@
 
     if ($('tabSecretary')) $('tabSecretary').className = role === 'secretary' ? activeBtn : inactiveBtn;
     if ($('tabProjection')) $('tabProjection').className = role === 'projection' ? activeBtn : inactiveBtn;
-
-    if (role === 'voter') {
-      $('header').classList.add('hidden');
-      $('connection').classList.add('hidden');
-    }
+    if ($('tabVoter')) $('tabVoter').className = role === 'voter' ? activeBtn : inactiveBtn;
 
     render();
   }
@@ -284,9 +285,6 @@
     if ($('toggleButton')) {
       $('toggleButton').textContent = isOpen ? 'Cerrar votación' : 'Abrir votación';
       $('toggleButton').disabled = !poll.id;
-    }
-    if ($('pollIdLabel')) {
-      $('pollIdLabel').textContent = poll.id ? 'ID de la votación: ' + poll.id : 'Todavía no hay votación creada.';
     }
 
     $('projectionTitle').textContent = title;
@@ -340,9 +338,9 @@
   }
 
   function updateQr() {
-    const qr = $('qr'), pQr = $('pQr'), link = $('voterLink');
+    const qr = $('qr'), pQr = $('pQr');
     if (!qr || !pQr) return;
-    qr.replaceChildren(); pQr.replaceChildren(); if (link) { link.textContent = ''; link.removeAttribute('href'); }
+    qr.replaceChildren(); pQr.replaceChildren();
     if (!poll.id) return;
 
     const url = new URL(location.pathname, location.origin);
@@ -350,7 +348,6 @@
     url.searchParams.set('poll', poll.id);
 
     const voterUrl = url.href;
-    if (link) { link.href = voterUrl; link.textContent = voterUrl; }
     
     const imageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(voterUrl);
     const img1 = document.createElement('img');
@@ -405,6 +402,24 @@
       $('voterMessage').textContent = '¡Voto registrado con éxito: ' + (choice === 'yes' ? 'SÍ' : choice === 'no' ? 'NO' : 'ABSTENCIÓN') + '!';
     } catch (err) {
       $('voterMessage').textContent = 'Error al registrar el voto.';
+    }
+  }
+
+  // BORRAR HISTORIAL COMPLETO
+  window.clearHistory = async function() {
+    if (pollHistory.length === 0) return alert("El historial ya está vacío.");
+    if (!confirm("¿Seguro que deseas borrar todo el historial de votaciones de esta sesión?")) return;
+
+    try {
+      // Eliminar todas las votaciones guardadas
+      for (const p of pollHistory) {
+        await deleteDoc(doc(db, "polls", p.id));
+      }
+      pollHistory = [];
+      renderHistoryTable();
+      alert("Historial eliminado correctamente.");
+    } catch (err) {
+      alert("Error al borrar el historial: " + err.message);
     }
   }
 
