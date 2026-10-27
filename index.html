@@ -220,6 +220,7 @@
   let poll = { id: null, title: '', is_open: true, updated_at: null };
   let votes = {};
   let pollHistory = [];
+  let isDeleting = false; // Bandera para evitar que la escucha recargue los datos mientras se borran
   let unsubscribePoll = null;
   let unsubscribeVotes = null;
   let chart = null;
@@ -245,7 +246,7 @@
     const inactiveBtn = "rounded-lg bg-slate-200 text-slate-700 px-3 py-2 font-semibold text-xs hover:bg-slate-300";
 
     if ($('tabSecretary')) $('tabSecretary').className = role === 'secretary' ? activeBtn : inactiveBtn;
-    if ($('tabProjection')) $('tabProjection').className = role === 'projection' ? role === 'projection' ? activeBtn : inactiveBtn : inactiveBtn;
+    if ($('tabProjection')) $('tabProjection').className = role === 'projection' ? activeBtn : inactiveBtn;
     if ($('tabVoter')) $('tabVoter').className = role === 'voter' ? activeBtn : inactiveBtn;
 
     render();
@@ -418,32 +419,36 @@
     }
   }
 
-  // BORRAR HISTORIAL AL INSTANTE SIN RECARGAR
+  // BORRAR HISTORIAL AL INSTANTE (CON BLOQUEO DE SINCRONIZACIÓN TEMPORAL)
   window.clearHistory = async function() {
     if (pollHistory.length === 0) return alert("El historial ya está vacío.");
     if (!confirm("¿Seguro que deseas borrar todo el historial de votaciones de esta sesión?")) return;
 
     try {
-      // 1. Borrar de Firebase en segundo plano
-      const promises = pollHistory.map(p => deleteDoc(doc(db, "polls", p.id)));
-      await Promise.all(promises);
+      isDeleting = true; // Bloquea la escucha automática momentáneamente
 
-      // 2. Limpiar variables locales inmediatamente
+      // 1. Limpiar variables y pantalla de inmediato
       pollHistory = [];
       poll = { id: null, title: '', is_open: true, updated_at: null };
       votes = {};
       pollId = null;
 
-      // 3. Limpiar inputs y QR visualmente al instante
       if ($('titleInput')) $('titleInput').value = '';
       if ($('qr')) $('qr').replaceChildren();
       if ($('pQr')) $('pQr').replaceChildren();
 
-      // 4. Actualizar toda la interfaz de golpe sin recargar
       render();
       history.replaceState({}, '', location.pathname);
 
+      // 2. Borrar de Firebase en segundo plano
+      const q = query(collection(db, "polls"));
+      const snapshot = await getDocs(q);
+      const promises = snapshot.docs.map(d => deleteDoc(d.ref));
+      await Promise.all(promises);
+
+      isDeleting = false; // Reactiva la escucha normal
     } catch (err) {
+      isDeleting = false;
       alert("Error al borrar el historial: " + err.message);
     }
   }
@@ -506,6 +511,8 @@
   function listenToAllPolls() {
     const q = query(collection(db, "polls"));
     onSnapshot(q, async (snapshot) => {
+      if (isDeleting) return; // Si se está borrando, ignora la actualización para evitar bucles
+
       const pollsList = [];
       for (const docSnap of snapshot.docs) {
         const pData = { id: docSnap.id, ...docSnap.data() };
