@@ -17,7 +17,7 @@
 </head>
 <body class="min-h-screen bg-slate-100 text-slate-800">
 
-<!-- Cabecera de control (Solo visible en el PC para el Secretario/Proyección) -->
+<!-- Cabecera de control (Navegación para el PC) -->
 <header id="header" class="bg-white border-b p-4 sticky top-0 z-50 shadow-sm">
   <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
     <h1 class="font-bold text-xl text-slate-900">Votación Digital</h1>
@@ -234,6 +234,9 @@
 
   const $ = id => document.getElementById(id);
 
+  // Determinar si la página fue abierta directamente escaneando el QR
+  const isQrAccess = params.get('role') === 'voter';
+
   window.setRole = function(newRole) {
     if (!['secretary', 'projection', 'voter'].includes(newRole)) return;
     role = newRole;
@@ -249,8 +252,8 @@
     if ($('tabProjection')) $('tabProjection').className = role === 'projection' ? activeBtn : inactiveBtn;
     if ($('tabVoter')) $('tabVoter').className = role === 'voter' ? activeBtn : inactiveBtn;
 
-    // Si entra como votante (por ejemplo, al escanear el QR), ocultar por completo la barra superior de control
-    if (role === 'voter') {
+    // Solo se oculta la navegación si el usuario ha entrado escaneando el QR directamente
+    if (isQrAccess && role === 'voter') {
       $('header').classList.add('hidden');
       $('connection').classList.add('hidden');
     } else {
