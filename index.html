@@ -39,11 +39,28 @@
   <section id="secretary" class="space-y-5">
     <div class="bg-white rounded-2xl shadow-sm p-5 space-y-4">
       <h2 class="font-bold text-lg text-slate-900">Control de la votación</h2>
-      <label for="titleInput" class="block text-sm font-medium text-slate-600">Punto del día</label>
-      <input id="titleInput" class="w-full border border-slate-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-             placeholder="Ej.: Aprobación de presupuestos">
       
-      <div class="flex flex-wrap gap-2">
+      <!-- Título de la Asamblea y Fecha alineados -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="md:col-span-2">
+          <label for="assemblyTitleInput" class="block text-sm font-medium text-indigo-600 mb-1">Título de la Asamblea / Plenario (Se guarda)</label>
+          <input id="assemblyTitleInput" class="w-full border border-indigo-200 bg-indigo-50/30 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-slate-900"
+                 placeholder="Ej.: Asamblea General Ordinaria">
+        </div>
+        <div>
+          <label for="assemblyDateInput" class="block text-sm font-medium text-indigo-600 mb-1">Fecha</label>
+          <input id="assemblyDateInput" type="date" class="w-full border border-indigo-200 bg-indigo-50/30 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-slate-900">
+        </div>
+      </div>
+
+      <!-- Punto específico del día -->
+      <div>
+        <label for="titleInput" class="block text-sm font-medium text-slate-600 mb-1">Punto del día actual</label>
+        <input id="titleInput" class="w-full border border-slate-300 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+               placeholder="Ej.: Aprobación de presupuestos anuales">
+      </div>
+      
+      <div class="flex flex-wrap gap-2 pt-2">
         <button onclick="window.createPoll()" class="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 font-bold text-sm shadow-sm transition">
           Crear punto y generar QR
         </button>
@@ -217,7 +234,7 @@
   const params = new URLSearchParams(location.search);
   let role = params.get('role') || 'secretary';
   let pollId = params.get('poll') || null;
-  let poll = { id: null, title: '', is_open: true, updated_at: null };
+  let poll = { id: null, title: '', assembly_title: '', assembly_date: '', is_open: true, updated_at: null };
   let votes = {};
   let pollHistory = [];
   let isDeleting = false;
@@ -234,7 +251,33 @@
 
   const $ = id => document.getElementById(id);
 
-  // Determinar si la página fue abierta directamente escaneando el QR
+  // Recuperar título y fecha de la asamblea guardados en el navegador
+  const savedAssemblyTitle = localStorage.getItem('asamblea_general_title') || '';
+  const savedAssemblyDate = localStorage.getItem('asamblea_general_date') || new Date().toISOString().split('T')[0];
+
+  if ($('assemblyTitleInput')) {
+    $('assemblyTitleInput').value = savedAssemblyTitle;
+    poll.assembly_title = savedAssemblyTitle;
+  }
+  if ($('assemblyDateInput')) {
+    $('assemblyDateInput').value = savedAssemblyDate;
+    poll.assembly_date = savedAssemblyDate;
+  }
+
+  // Guardar automáticamente al escribir en título o cambiar fecha
+  document.addEventListener('input', (e) => {
+    if (e.target && e.target.id === 'assemblyTitleInput') {
+      const val = e.target.value;
+      localStorage.setItem('asamblea_general_title', val);
+      poll.assembly_title = val;
+    }
+    if (e.target && e.target.id === 'assemblyDateInput') {
+      const val = e.target.value;
+      localStorage.setItem('asamblea_general_date', val);
+      poll.assembly_date = val;
+    }
+  });
+
   const isQrAccess = params.get('role') === 'voter';
 
   window.setRole = function(newRole) {
@@ -252,7 +295,6 @@
     if ($('tabProjection')) $('tabProjection').className = role === 'projection' ? activeBtn : inactiveBtn;
     if ($('tabVoter')) $('tabVoter').className = role === 'voter' ? activeBtn : inactiveBtn;
 
-    // Solo se oculta la navegación si el usuario ha entrado escaneando el QR directamente
     if (isQrAccess && role === 'voter') {
       $('header').classList.add('hidden');
       $('connection').classList.add('hidden');
@@ -388,16 +430,18 @@
 
   window.createPoll = async function() {
     const title = $('titleInput').value.trim();
-    if (!title) return alert('Escribe el punto que se va a votar.');
+    const assemblyTitle = $('assemblyTitleInput').value.trim();
+    const assemblyDate = $('assemblyDateInput').value.trim();
+    if (!title) return alert('Escribe el punto del día que se va a votar.');
 
     const newId = 'poll_' + Date.now();
     const nowIso = new Date().toISOString();
     try {
       await setDoc(doc(db, "polls", newId), {
-        title, is_open: true, updated_at: nowIso
+        title, assembly_title: assemblyTitle, assembly_date: assemblyDate, is_open: true, updated_at: nowIso
       });
 
-      poll = { id: newId, title, is_open: true, updated_at: nowIso };
+      poll = { id: newId, title, assembly_title: assemblyTitle, assembly_date: assemblyDate, is_open: true, updated_at: nowIso };
       pollId = newId;
       votes = {};
       listenToPoll(newId);
@@ -412,8 +456,10 @@
   window.togglePoll = async function() {
     if (!poll.id) return;
     const newStatus = !poll.is_open;
+    const assemblyTitle = $('assemblyTitleInput').value.trim();
+    const assemblyDate = $('assemblyDateInput').value.trim();
     const nowIso = new Date().toISOString();
-    await updateDoc(doc(db, "polls", poll.id), { is_open: newStatus, updated_at: nowIso });
+    await updateDoc(doc(db, "polls", poll.id), { is_open: newStatus, assembly_title: assemblyTitle, assembly_date: assemblyDate, updated_at: nowIso });
   }
 
   window.castVote = async function(choice) {
@@ -439,7 +485,7 @@
       isDeleting = true;
 
       pollHistory = [];
-      poll = { id: null, title: '', is_open: true, updated_at: null };
+      poll = { id: null, title: '', assembly_title: $('assemblyTitleInput').value.trim(), assembly_date: $('assemblyDateInput').value.trim(), is_open: true, updated_at: null };
       votes = {};
       pollId = null;
 
@@ -462,13 +508,19 @@
     }
   }
 
+  // EXPORTAR A EXCEL CON TÍTULO Y FECHA
   window.exportExcel = function() {
     if (pollHistory.length === 0) return alert("No hay datos en el historial para exportar.");
+
+    const assemblyName = $('assemblyTitleInput').value.trim() || "Asamblea General";
+    const assemblyDate = $('assemblyDateInput').value.trim() || "-";
 
     const dataToExport = pollHistory.map(item => {
       const date = item.updated_at ? new Date(item.updated_at) : new Date();
       return {
-        "Hora": date.toLocaleTimeString(),
+        "Asamblea / Plenario": item.assembly_title || assemblyName,
+        "Fecha Asamblea": item.assembly_date || assemblyDate,
+        "Hora Punto": date.toLocaleTimeString(),
         "Punto del Día": item.title,
         "Estado": item.is_open ? 'Abierta' : 'Cerrada',
         "Votos SÍ": item.counts?.yes || 0,
@@ -480,20 +532,24 @@
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Historial Votaciones");
-    XLSX.writeFile(workbook, `Acta_Asamblea_${Date.now()}.xlsx`);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Acta Votaciones");
+    XLSX.writeFile(workbook, `Acta_${Date.now()}.xlsx`);
   }
 
+  // EXPORTAR A PDF CON TÍTULO Y FECHA
   window.exportPDF = function() {
     if (pollHistory.length === 0) return alert("No hay datos en el historial para exportar.");
 
+    const assemblyName = $('assemblyTitleInput').value.trim() || "Acta Oficial de Votación Digital";
+    const assemblyDate = $('assemblyDateInput').value.trim() || "";
     const { jsPDF } = window.jspdf;
     const docPdf = new jsPDF();
 
-    docPdf.setFontSize(18);
-    docPdf.text("Acta Oficial de Votación Digital", 14, 20);
+    docPdf.setFontSize(16);
+    docPdf.text(assemblyName, 14, 20, { maxWidth: 180 });
+    
     docPdf.setFontSize(10);
-    docPdf.text(`Fecha de emisión: ${new Date().toLocaleString()}`, 14, 28);
+    docPdf.text(`Fecha: ${assemblyDate} | Emitido: ${new Date().toLocaleString()}`, 14, 28);
 
     const tableColumn = ["Hora", "Punto del Día", "Estado", "SÍ", "NO", "Abs.", "Total"];
     const tableRows = pollHistory.map(item => [
@@ -514,7 +570,7 @@
       headStyles: { fillColor: [79, 70, 229] }
     });
 
-    docPdf.save(`Acta_Asamblea_${Date.now()}.pdf`);
+    docPdf.save(`Acta_${Date.now()}.pdf`);
   }
 
   function listenToAllPolls() {
@@ -554,6 +610,12 @@
         poll = { id: docSnap.id, ...docSnap.data() };
         render();
         updateQr();
+        if (poll.assembly_title && $('assemblyTitleInput') && !$('assemblyTitleInput').value) {
+          $('assemblyTitleInput').value = poll.assembly_title;
+        }
+        if (poll.assembly_date && $('assemblyDateInput') && !$('assemblyDateInput').value) {
+          $('assemblyDateInput').value = poll.assembly_date;
+        }
       }
     });
 
@@ -578,6 +640,12 @@
         if (docSnap.exists()) {
           poll = { id: docSnap.id, ...docSnap.data() };
           if ($('titleInput')) $('titleInput').value = poll.title;
+          if (poll.assembly_title && $('assemblyTitleInput')) {
+            $('assemblyTitleInput').value = poll.assembly_title;
+          }
+          if (poll.assembly_date && $('assemblyDateInput')) {
+            $('assemblyDateInput').value = poll.assembly_date;
+          }
           updateQr();
         }
         listenToPoll(pollId);
