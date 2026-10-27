@@ -52,7 +52,7 @@
         </button>
       </div>
       
-      <!-- Contenedor del Código QR (Sin enlace de texto debajo) -->
+      <!-- Contenedor del Código QR -->
       <div class="flex flex-col items-center border border-slate-200 rounded-xl p-4 gap-2 bg-slate-50">
         <h3 class="font-semibold text-slate-700 text-sm">QR para escanear y votar</h3>
         <div id="qr" class="bg-white p-3 rounded-xl shadow-sm min-h-[180px] flex items-center justify-center">
@@ -86,8 +86,10 @@
     <!-- HISTORIAL DE VOTACIONES -->
     <div class="bg-white rounded-2xl p-5 shadow-sm space-y-4">
       <div class="flex flex-wrap justify-between items-center gap-2">
-        <h2 class="font-bold text-slate-800 text-sm">Historial de puntos votados en la sesión</h2>
-        <!-- Botón para borrar el historial -->
+        <div>
+          <h2 class="font-bold text-slate-800 text-sm">Historial de puntos votados</h2>
+          <p class="text-xs text-slate-400">Haz clic en cualquier fila para seleccionar y reabrir un punto anterior si alguien faltó por votar.</p>
+        </div>
         <button onclick="window.clearHistory()" class="rounded-lg bg-slate-100 hover:bg-rose-50 text-rose-600 border border-rose-200 px-3 py-1.5 font-bold text-xs transition">
           🗑️ Borrar Historial
         </button>
@@ -243,7 +245,7 @@
     const inactiveBtn = "rounded-lg bg-slate-200 text-slate-700 px-3 py-2 font-semibold text-xs hover:bg-slate-300";
 
     if ($('tabSecretary')) $('tabSecretary').className = role === 'secretary' ? activeBtn : inactiveBtn;
-    if ($('tabProjection')) $('tabProjection').className = role === 'projection' ? activeBtn : inactiveBtn;
+    if ($('tabProjection')) $('tabProjection').className = role === 'projection' ? role === 'projection' ? activeBtn : inactiveBtn : inactiveBtn;
     if ($('tabVoter')) $('tabVoter').className = role === 'voter' ? activeBtn : inactiveBtn;
 
     render();
@@ -286,6 +288,9 @@
       $('toggleButton').textContent = isOpen ? 'Cerrar votación' : 'Abrir votación';
       $('toggleButton').disabled = !poll.id;
     }
+    if ($('titleInput') && poll.title && document.activeElement !== $('titleInput')) {
+      $('titleInput').value = poll.title;
+    }
 
     $('projectionTitle').textContent = title;
     $('projectionStatus').textContent = statusText;
@@ -318,11 +323,13 @@
     tbody.innerHTML = pollHistory.map(item => {
       const date = item.updated_at ? new Date(item.updated_at) : new Date();
       const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const isSelected = item.id === poll.id;
+      const rowClass = isSelected ? 'bg-indigo-50 border-l-4 border-indigo-600' : 'hover:bg-slate-50';
 
       return `
-        <tr class="border-b hover:bg-slate-50 transition">
+        <tr onclick="window.selectPoll('${item.id}')" class="${rowClass} border-b cursor-pointer transition">
           <td class="p-3 font-mono text-slate-500">${timeStr}</td>
-          <td class="p-3 font-semibold text-slate-800">${item.title}</td>
+          <td class="p-3 font-semibold text-slate-800">${item.title} ${isSelected ? '<span class="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded ml-2">Activo</span>' : ''}</td>
           <td class="p-3 text-center">
             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${item.is_open ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}">
               ${item.is_open ? 'Abierta' : 'Cerrada'}
@@ -335,6 +342,12 @@
         </tr>
       `;
     }).join('');
+  }
+
+  window.selectPoll = function(id) {
+    pollId = id;
+    listenToPoll(id);
+    history.replaceState({}, '', location.pathname + '?poll=' + id);
   }
 
   function updateQr() {
@@ -405,19 +418,31 @@
     }
   }
 
-  // BORRAR HISTORIAL COMPLETO
+  // BORRAR HISTORIAL AL INSTANTE SIN RECARGAR
   window.clearHistory = async function() {
     if (pollHistory.length === 0) return alert("El historial ya está vacío.");
     if (!confirm("¿Seguro que deseas borrar todo el historial de votaciones de esta sesión?")) return;
 
     try {
-      // Eliminar todas las votaciones guardadas
-      for (const p of pollHistory) {
-        await deleteDoc(doc(db, "polls", p.id));
-      }
+      // 1. Borrar de Firebase en segundo plano
+      const promises = pollHistory.map(p => deleteDoc(doc(db, "polls", p.id)));
+      await Promise.all(promises);
+
+      // 2. Limpiar variables locales inmediatamente
       pollHistory = [];
-      renderHistoryTable();
-      alert("Historial eliminado correctamente.");
+      poll = { id: null, title: '', is_open: true, updated_at: null };
+      votes = {};
+      pollId = null;
+
+      // 3. Limpiar inputs y QR visualmente al instante
+      if ($('titleInput')) $('titleInput').value = '';
+      if ($('qr')) $('qr').replaceChildren();
+      if ($('pQr')) $('pQr').replaceChildren();
+
+      // 4. Actualizar toda la interfaz de golpe sin recargar
+      render();
+      history.replaceState({}, '', location.pathname);
+
     } catch (err) {
       alert("Error al borrar el historial: " + err.message);
     }
