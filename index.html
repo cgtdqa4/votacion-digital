@@ -17,17 +17,17 @@
   <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
     <h1 class="font-bold text-xl">Votación Digital</h1>
     <nav id="nav" class="flex flex-wrap gap-2">
-      <button onclick="setRole('secretary')" class="rounded-lg bg-indigo-600 text-white px-3 py-2">Secretario</button>
-      <button onclick="setRole('projection')" class="rounded-lg bg-slate-200 px-3 py-2">Proyección</button>
-      <button onclick="setRole('voter')" class="rounded-lg bg-slate-200 px-3 py-2">Votante</button>
+      <button onclick="window.setRole('secretary')" id="tabSecretary" class="rounded-lg bg-indigo-600 text-white px-3 py-2 font-semibold">Secretario</button>
+      <button onclick="window.setRole('projection')" id="tabProjection" class="rounded-lg bg-slate-200 px-3 py-2 font-semibold">Proyección</button>
+      <button onclick="window.setRole('voter')" id="tabVoter" class="rounded-lg bg-slate-200 px-3 py-2 font-semibold">Votante</button>
     </nav>
   </div>
 </header>
 
 <main class="max-w-6xl mx-auto p-4 space-y-5">
 
-  <div id="connection" class="rounded-lg bg-emerald-100 text-emerald-900 p-3 text-sm">
-    Conectado a Firebase Realtime.
+  <div id="connection" class="rounded-lg bg-emerald-100 text-emerald-900 p-3 text-sm font-medium">
+    Conectado a Firebase en tiempo real.
   </div>
 
   <section id="secretary" class="space-y-5">
@@ -37,85 +37,84 @@
       <input id="titleInput" class="w-full border rounded-xl p-3"
              placeholder="Ej.: Aprobación de presupuestos">
       <div class="flex flex-wrap gap-2">
-        <button onclick="createPoll()" class="rounded-xl bg-indigo-600 text-white px-4 py-3">
+        <button onclick="window.createPoll()" class="rounded-xl bg-indigo-600 text-white px-4 py-3 font-bold">
           Crear punto y generar QR
         </button>
-        <button id="toggleButton" onclick="togglePoll()" class="rounded-xl bg-amber-500 text-white px-4 py-3">
+        <button id="toggleButton" onclick="window.togglePoll()" class="rounded-xl bg-amber-500 text-white px-4 py-3 font-bold">
           Cerrar votación
         </button>
       </div>
       <p id="pollIdLabel" class="text-xs text-slate-500 break-all">Todavía no hay votación creada.</p>
-      <div class="flex flex-col items-center border rounded-xl p-4 gap-2">
-        <h3 class="font-semibold">QR para votar</h3>
-        <div id="qr"></div>
-        <a id="voterLink" class="text-indigo-600 text-sm underline break-all" target="_blank" rel="noopener"></a>
+      <div class="flex flex-col items-center border rounded-xl p-4 gap-2 bg-slate-50">
+        <h3 class="font-semibold text-slate-700">QR para votar</h3>
+        <div id="qr" class="bg-white p-2 rounded-xl shadow-sm"></div>
+        <a id="voterLink" class="text-indigo-600 text-sm underline break-all text-center" target="_blank" rel="noopener"></a>
       </div>
     </div>
 
     <div class="grid grid-cols-3 gap-3">
-      <div class="bg-emerald-50 rounded-xl p-4 text-center">
-        <p class="text-sm">SÍ</p><strong id="yes" class="text-3xl">0</strong>
+      <div class="bg-emerald-50 rounded-xl p-4 text-center border border-emerald-100">
+        <p class="text-xs font-bold text-emerald-800">SÍ</p><strong id="yes" class="text-3xl text-emerald-900">0</strong>
       </div>
-      <div class="bg-rose-50 rounded-xl p-4 text-center">
-        <p class="text-sm">NO</p><strong id="no" class="text-3xl">0</strong>
+      <div class="bg-rose-50 rounded-xl p-4 text-center border border-rose-100">
+        <p class="text-xs font-bold text-rose-800">NO</p><strong id="no" class="text-3xl text-rose-900">0</strong>
       </div>
-      <div class="bg-amber-50 rounded-xl p-4 text-center">
-        <p class="text-sm">Abstención</p><strong id="abstain" class="text-3xl">0</strong>
+      <div class="bg-amber-50 rounded-xl p-4 text-center border border-amber-100">
+        <p class="text-xs font-bold text-amber-800">Abstención</p><strong id="abstain" class="text-3xl text-amber-900">0</strong>
       </div>
     </div>
 
     <div class="bg-white rounded-2xl p-5 shadow-sm">
       <h2 class="font-bold mb-4">Resultados en tiempo real</h2>
-      <p>Total de votos: <strong id="total">0</strong></p>
+      <p class="text-sm text-slate-600 mb-2">Total de votos: <strong id="total">0</strong></p>
       <div class="h-72"><canvas id="chart"></canvas></div>
     </div>
   </section>
 
   <section id="projection" class="hidden space-y-5">
     <div class="bg-white rounded-2xl p-6 text-center shadow-sm">
-      <p class="text-indigo-600 font-bold uppercase text-sm">Punto en votación</p>
-      <h2 id="projectionTitle" class="text-3xl font-black my-5">Esperando votación...</h2>
-      <p id="projectionStatus" class="font-semibold mb-5">Conectado...</p>
-      <div class="grid grid-cols-3 gap-3">
-        <div class="bg-emerald-50 rounded-xl p-4">
-          <p>SÍ</p><strong id="pYes" class="text-4xl">0</strong>
+      <p class="text-indigo-600 font-bold uppercase text-xs tracking-wider">Punto en votación</p>
+      <h2 id="projectionTitle" class="text-3xl font-black my-4 text-slate-900">Esperando votación...</h2>
+      <p id="projectionStatus" class="font-semibold mb-6 text-sm text-emerald-600">Conectado...</p>
+      <div class="grid grid-cols-3 gap-4">
+        <div class="bg-emerald-50 rounded-2xl p-4 border border-emerald-200">
+          <p class="text-xs font-bold text-emerald-800">SÍ</p><strong id="pYes" class="text-4xl text-emerald-900">0</strong>
         </div>
-        <div class="bg-rose-50 rounded-xl p-4">
-          <p>NO</p><strong id="pNo" class="text-4xl">0</strong>
+        <div class="bg-rose-50 rounded-2xl p-4 border border-rose-200">
+          <p class="text-xs font-bold text-rose-800">NO</p><strong id="pNo" class="text-4xl text-rose-900">0</strong>
         </div>
-        <div class="bg-amber-50 rounded-xl p-4">
-          <p>Abstención</p><strong id="pAbstain" class="text-4xl">0</strong>
+        <div class="bg-amber-50 rounded-2xl p-4 border border-amber-200">
+          <p class="text-xs font-bold text-amber-800">Abstención</p><strong id="pAbstain" class="text-4xl text-amber-900">0</strong>
         </div>
       </div>
-      <p class="mt-4">Total de votos: <strong id="pTotal">0</strong></p>
+      <p class="mt-4 text-sm text-slate-600">Total de votos de la sala: <strong id="pTotal">0</strong></p>
     </div>
-    <div class="bg-white rounded-2xl p-5">
-      <div class="h-80"><canvas id="pChart"></canvas></div>
-      <div id="pQr" class="flex justify-center mt-4"></div>
+    <div class="bg-white rounded-2xl p-5 shadow-sm flex flex-col items-center">
+      <div class="h-64 w-full mb-4"><canvas id="pChart"></canvas></div>
+      <div id="pQr" class="bg-slate-50 p-3 rounded-2xl border"></div>
     </div>
   </section>
 
   <section id="voter" class="hidden max-w-md mx-auto space-y-4">
-    <div class="bg-white rounded-2xl p-5 text-center shadow-sm">
-      <h2 id="voterTitle" class="font-bold text-xl">Cargando punto...</h2>
-      <p id="voterStatus" class="mt-2 text-sm">Conectando...</p>
+    <div class="bg-white rounded-2xl p-6 text-center shadow-sm space-y-2">
+      <h2 id="voterTitle" class="font-bold text-xl text-slate-900">Cargando punto...</h2>
+      <p id="voterStatus" class="text-xs font-semibold px-2.5 py-1 rounded-full inline-block bg-emerald-100 text-emerald-800">Conectando...</p>
     </div>
     <div id="voterButtons" class="space-y-3">
-      <button onclick="castVote('yes')" class="w-full rounded-2xl bg-emerald-600 text-white text-xl font-bold p-5">SÍ · A favor</button>
-      <button onclick="castVote('no')" class="w-full rounded-2xl bg-rose-600 text-white text-xl font-bold p-5">NO · En contra</button>
-      <button onclick="castVote('abstain')" class="w-full rounded-2xl bg-amber-500 text-white text-xl font-bold p-5">ABSTENCIÓN</button>
+      <button onclick="window.castVote('yes')" class="w-full rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold py-4 shadow-md transition">SÍ · A favor</button>
+      <button onclick="window.castVote('no')" class="w-full rounded-2xl bg-rose-600 hover:bg-rose-700 text-white text-lg font-bold py-4 shadow-md transition">NO · En contra</button>
+      <button onclick="window.castVote('abstain')" class="w-full rounded-2xl bg-amber-500 hover:bg-amber-600 text-white text-lg font-bold py-4 shadow-md transition">ABSTENCIÓN</button>
     </div>
-    <p id="voterMessage" class="text-center text-sm" aria-live="polite"></p>
+    <p id="voterMessage" class="text-center text-sm font-medium text-slate-600" aria-live="polite"></p>
   </section>
 
 </main>
 
-<!-- SDK Modular de Firebase (Firestore) -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-  // TODO: Sustituye esto con la configuración de tu proyecto en la consola de Firebase
+  // Configuración de Firebase (asegúrate de poner tus credenciales reales aquí)
   const firebaseConfig = {
     apiKey: "TU_API_KEY_DE_FIREBASE",
     authDomain: "tu-proyecto.firebaseapp.com",
@@ -146,7 +145,8 @@
 
   const $ = id => document.getElementById(id);
 
-  function setRole(newRole) {
+  // Exponer setRole globalmente para que funcionen las pestañas
+  window.setRole = function(newRole) {
     if (!['secretary', 'projection', 'voter'].includes(newRole)) return;
     role = newRole;
 
@@ -155,6 +155,14 @@
     $('secretary').classList.toggle('hidden', role !== 'secretary');
     $('projection').classList.toggle('hidden', role !== 'projection');
     $('voter').classList.toggle('hidden', role !== 'voter');
+
+    // Estilos visuales de los botones de pestañas
+    const activeBtn = "rounded-lg bg-indigo-600 text-white px-3 py-2 font-semibold shadow-sm";
+    const inactiveBtn = "rounded-lg bg-slate-200 text-slate-700 px-3 py-2 font-semibold hover:bg-slate-300";
+
+    $('tabSecretary').className = role === 'secretary' ? activeBtn : inactiveBtn;
+    $('tabProjection').className = role === 'projection' ? activeBtn : inactiveBtn;
+    $('tabVoter').className = role === 'voter' ? activeBtn : inactiveBtn;
 
     if (role === 'voter') {
       $('connection').classList.add('hidden');
@@ -165,11 +173,12 @@
   }
 
   function initCharts() {
+    if (chart) return;
     const config = {
       type: 'bar',
       data: {
         labels: ['SÍ', 'NO', 'ABSTENCIÓN'],
-        datasets: [{ data: [0, 0, 0], backgroundColor: ['#059669', '#e11d48', '#d97706'] }]
+        datasets: [{ data: [0, 0, 0], backgroundColor: ['#059669', '#e11d48', '#d97706'], borderRadius: 6 }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
@@ -205,6 +214,8 @@
 
     $('voterTitle').textContent = title;
     $('voterStatus').textContent = status;
+    $('voterStatus').className = "text-xs font-semibold px-2.5 py-1 rounded-full inline-block " + (poll.is_open ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800");
+    $('voterStatus').textContent = status;
     $('voterButtons').classList.toggle('hidden', !poll.is_open);
 
     $('toggleButton').textContent = poll.is_open ? 'Cerrar votación' : 'Abrir votación';
@@ -215,8 +226,10 @@
     if (projectionChart) { projectionChart.data.datasets[0].data = [counts.yes, counts.no, counts.abstain]; projectionChart.update(); }
   }
 
+  // Generación automática del código QR visual
   function updateQr() {
     const qr = $('qr'), pQr = $('pQr'), link = $('voterLink');
+    if (!qr || !pQr) return;
     qr.replaceChildren(); pQr.replaceChildren(); link.textContent = ''; link.removeAttribute('href');
     if (!poll.id) return;
 
@@ -226,11 +239,15 @@
 
     const voterUrl = url.href;
     link.href = voterUrl; link.textContent = voterUrl;
-    const imageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(voterUrl);
+    const imageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(voterUrl);
     
-    const img = document.createElement('img');
-    img.src = imageUrl; img.width = 220; img.height = 220;
-    qr.appendChild(img); pQr.appendChild(img.cloneNode());
+    const img1 = document.createElement('img');
+    img1.src = imageUrl; img1.width = 180; img1.height = 180; img1.className = "rounded-lg";
+    qr.appendChild(img1);
+
+    const img2 = document.createElement('img');
+    img2.src = imageUrl; img2.width = 180; img2.height = 180; img2.className = "rounded-lg";
+    pQr.appendChild(img2);
   }
 
   window.createPoll = async function() {
@@ -266,22 +283,21 @@
       poll_id: poll.id, voter_id: voterId, choice, created_at: new Date().toISOString()
     });
 
-    $('voterMessage').textContent = 'Voto guardado: ' + (choice === 'yes' ? 'SÍ' : choice === 'no' ? 'NO' : 'ABSTENCIÓN');
+    $('voterMessage').textContent = 'Voto guardado correctamente: ' + (choice === 'yes' ? 'SÍ' : choice === 'no' ? 'NO' : 'ABSTENCIÓN');
   }
 
   function listenToPoll(id) {
     if (unsubscribePoll) unsubscribePoll();
     if (unsubscribeVotes) unsubscribeVotes();
 
-    // Escuchar cambios en la votación en tiempo real
     unsubscribePoll = onSnapshot(doc(db, "polls", id), (docSnap) => {
       if (docSnap.exists()) {
         poll = { id: docSnap.id, ...docSnap.data() };
         render();
+        updateQr();
       }
     });
 
-    // Escuchar votos en tiempo real de este punto
     const q = query(collection(db, "votes"), where("poll_id", "==", id));
     unsubscribeVotes = onSnapshot(q, (snapshot) => {
       votes = {};
@@ -295,7 +311,7 @@
 
   async function start() {
     initCharts();
-    setRole(role);
+    window.setRole(role);
     if (pollId) {
       const docSnap = await getDoc(doc(db, "polls", pollId));
       if (docSnap.exists()) {
