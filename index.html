@@ -683,7 +683,6 @@
         const docSnap = await getDoc(doc(db, "polls", pollId));
         if (docSnap.exists()) {
           poll = { id: docSnap.id, ...docSnap.data() };
-          if ($('titleInput')) $('titleInput<b>id</b>')) $('titleInput').value = poll.title;
           if ($('titleInput')) $('titleInput').value = poll.title;
           if (poll.assembly_title && $('assemblyTitleInput')) {
             $('assemblyTitleInput').value = poll.assembly_title;
