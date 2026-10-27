@@ -16,7 +16,6 @@
 <header id="header" class="bg-white border-b p-4 sticky top-0 z-50 shadow-sm">
   <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
     <h1 class="font-bold text-xl text-slate-900">Votación Digital</h1>
-    <!-- Navegación siempre visible para poder cambiar de pestaña libremente -->
     <nav id="nav" class="flex flex-wrap gap-2">
       <button onclick="window.setRole('secretary')" id="tabSecretary" class="rounded-lg bg-indigo-600 text-white px-3 py-2 font-semibold text-xs">Secretario</button>
       <button onclick="window.setRole('projection')" id="tabProjection" class="rounded-lg bg-slate-200 text-slate-700 px-3 py-2 font-semibold text-xs">Proyección</button>
@@ -50,7 +49,7 @@
       
       <!-- Contenedor del Código QR -->
       <div class="flex flex-col items-center border border-slate-200 rounded-xl p-4 gap-2 bg-slate-50">
-        <h3 class="font-semibold text-slate-700 text-sm">QR para escanear y votar</h3>
+        <h3 class="font-semibold text-slate-700 text-sm">QR para escanear y votar (Sin login)</h3>
         <div id="qr" class="bg-white p-3 rounded-xl shadow-sm min-h-[180px] flex items-center justify-center">
           <p class="text-xs text-slate-400 italic">Genera un punto para ver el QR</p>
         </div>
@@ -105,7 +104,7 @@
     <div class="bg-white rounded-2xl p-5 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
       <div class="h-64 w-full"><canvas id="pChart"></canvas></div>
       <div class="flex flex-col items-center justify-center border-l border-slate-100 pl-4">
-        <p class="text-xs font-bold text-slate-600 mb-2">Escanea para votar desde el móvil</p>
+        <p class="text-xs font-bold text-slate-600 mb-2">Escanea para votar directamente</p>
         <div id="pQr" class="bg-slate-50 p-3 rounded-2xl border min-h-[160px] flex items-center justify-center">
           <p class="text-xs text-slate-400 italic">QR pendiente de generar</p>
         </div>
@@ -117,7 +116,7 @@
   <section id="voter" class="hidden max-w-md mx-auto space-y-4 py-4">
     <div class="bg-white rounded-2xl p-6 text-center shadow-sm space-y-2 border border-slate-200">
       <span class="text-[10px] font-bold tracking-widest text-indigo-600 uppercase bg-indigo-50 px-2.5 py-0.5 rounded-full">
-        Panel del Votante
+        Panel del Votante (Sin Registro)
       </span>
       <h2 id="voterTitle" class="font-bold text-lg text-slate-900 leading-snug">Cargando punto...</h2>
       <div id="voterStatusBadge" class="inline-block">
@@ -150,14 +149,15 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-  // Configuración de Firebase (asegúrate de poner tus credenciales reales aquí)
+  // Configuración de Firebase integrada correctamente
   const firebaseConfig = {
-    apiKey: "TU_API_KEY_DE_FIREBASE",
-    authDomain: "tu-proyecto.firebaseapp.com",
-    projectId: "tu-proyecto",
-    storageBucket: "tu-proyecto.appspot.com",
-    messagingSenderId: "...",
-    appId: "..."
+    apiKey: "AIzaSyCgS8nTPtBGCgAnCCpSjL8HByJLEWXP-TU",
+    authDomain: "votacion-online-70caf.firebaseapp.com",
+    projectId: "votacion-online-70caf",
+    storageBucket: "votacion-online-70caf.firebasestorage.app",
+    messagingSenderId: "224046046920",
+    appId: "1:224046046920:web:6196088456ef280356cffd",
+    measurementId: "G-XQ9N9N2ZGH"
   };
 
   const app = initializeApp(firebaseConfig);
@@ -166,7 +166,7 @@
   const params = new URLSearchParams(location.search);
   let role = params.get('role') || 'secretary';
   let pollId = params.get('poll') || null;
-  let poll = { id: null, title: '', is_open: true }; // Por defecto abierta para evitar bloqueo visual inicial
+  let poll = { id: null, title: '', is_open: true };
   let votes = {};
   let unsubscribePoll = null;
   let unsubscribeVotes = null;
@@ -181,7 +181,6 @@
 
   const $ = id => document.getElementById(id);
 
-  // Exponer setRole globalmente para que las pestañas funcionen siempre
   window.setRole = function(newRole) {
     if (!['secretary', 'projection', 'voter'].includes(newRole)) return;
     role = newRole;
@@ -226,10 +225,9 @@
 
     const total = counts.yes + counts.no + counts.abstain;
     const title = poll.title || 'Esperando punto a votar...';
-    const isOpen = poll.is_open !== false; // Si no está definido, se asume abierto por defecto
+    const isOpen = poll.is_open !== false;
     const statusText = isOpen ? 'Votación Abierta' : 'Votación Cerrada';
 
-    // Secretario
     $('yes').textContent = counts.yes;
     $('no').textContent = counts.no;
     $('abstain').textContent = counts.abstain;
@@ -238,7 +236,6 @@
     $('toggleButton').disabled = !poll.id;
     $('pollIdLabel').textContent = poll.id ? 'ID de la votación: ' + poll.id : 'Todavía no hay votación creada.';
 
-    // Proyección
     $('projectionTitle').textContent = title;
     $('projectionStatus').textContent = statusText;
     $('pYes').textContent = counts.yes;
@@ -246,7 +243,6 @@
     $('pAbstain').textContent = counts.abstain;
     $('pTotal').textContent = total;
 
-    // Votante
     $('voterTitle').textContent = title;
     $('voterStatus').textContent = statusText;
     $('voterStatus').className = "text-xs font-semibold px-2.5 py-0.5 rounded-full " + (isOpen ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800");
@@ -257,7 +253,6 @@
     if (projectionChart) { projectionChart.data.datasets[0].data = [counts.yes, counts.no, counts.abstain]; projectionChart.update(); }
   }
 
-  // Generación instantánea del QR
   function updateQr() {
     const qr = $('qr'), pQr = $('pQr'), link = $('voterLink');
     if (!qr || !pQr) return;
