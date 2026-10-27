@@ -78,20 +78,9 @@
 
     <!-- Resultados y Gráfico -->
     <div class="bg-white rounded-2xl p-5 shadow-sm space-y-4">
-      <div class="flex flex-wrap justify-between items-center gap-2">
-        <div>
-          <h2 class="font-bold text-slate-800 text-sm">Resultados en tiempo real</h2>
-          <p class="text-xs text-slate-500">Total de votos: <strong id="total" class="text-slate-800">0</strong></p>
-        </div>
-        <!-- Botones para exportar resultado actual -->
-        <div class="flex gap-2">
-          <button onclick="window.exportExcel()" class="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 font-bold text-xs shadow-sm flex items-center gap-1">
-            📊 Exportar Excel
-          </button>
-          <button onclick="window.exportPDF()" class="rounded-lg bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 font-bold text-xs shadow-sm flex items-center gap-1">
-            📄 Exportar PDF
-          </button>
-        </div>
+      <div>
+        <h2 class="font-bold text-slate-800 text-sm">Resultados en tiempo real</h2>
+        <p class="text-xs text-slate-500">Total de votos: <strong id="total" class="text-slate-800">0</strong></p>
       </div>
       <div class="h-64"><canvas id="chart"></canvas></div>
     </div>
@@ -114,10 +103,20 @@
           </thead>
           <tbody id="historyTableBody">
             <tr>
-              <td colspan="7" class="p-4 text-center text-slate-400 italic">Aún no hay puntos grabados en el historial.</td>
+              <td colspan="7" class="p-4 text-center text-slate-400 italic">Cargando historial...</td>
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- BOTONES DE EXPORTACIÓN (Debajo del historial) -->
+      <div class="flex flex-wrap gap-3 pt-3 border-t border-slate-100 justify-end">
+        <button onclick="window.exportExcel()" class="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 font-bold text-xs shadow-sm flex items-center gap-2 transition">
+          📊 Exportar Historial a Excel
+        </button>
+        <button onclick="window.exportPDF()" class="rounded-xl bg-rose-600 hover:bg-rose-700 text-white px-4 py-3 font-bold text-xs shadow-sm flex items-center gap-2 transition">
+          📄 Exportar Acta a PDF
+        </button>
       </div>
     </div>
   </section>
@@ -193,7 +192,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCgS8nTPtBGCgAnCCpSjL8HByJLEWXP-TU",
@@ -213,7 +212,7 @@
   let pollId = params.get('poll') || null;
   let poll = { id: null, title: '', is_open: true, updated_at: null };
   let votes = {};
-  let pollHistory = []; // Almacén del historial de puntos
+  let pollHistory = [];
   let unsubscribePoll = null;
   let unsubscribeVotes = null;
   let chart = null;
@@ -309,7 +308,6 @@
     renderHistoryTable();
   }
 
-  // Renderizar la tabla del historial con horas exactas
   function renderHistoryTable() {
     const tbody = $('historyTableBody');
     if (!tbody) return;
@@ -410,9 +408,8 @@
     }
   }
 
-  // EXPORTAR A EXCEL (.xlsx)
   window.exportExcel = function() {
-    if (!poll.id && pollHistory.length === 0) return alert("No hay datos para exportar.");
+    if (pollHistory.length === 0) return alert("No hay datos en el historial para exportar.");
 
     const dataToExport = pollHistory.map(item => {
       const date = item.updated_at ? new Date(item.updated_at) : new Date();
@@ -429,13 +426,12 @@
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Votaciones");
-    XLSX.writeFile(workbook, `Acta_Votacion_${Date.now()}.xlsx`);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Historial Votaciones");
+    XLSX.writeFile(workbook, `Acta_Asamblea_${Date.now()}.xlsx`);
   }
 
-  // EXPORTAR A PDF (.pdf)
   window.exportPDF = function() {
-    if (!poll.id && pollHistory.length === 0) return alert("No hay datos para exportar.");
+    if (pollHistory.length === 0) return alert("No hay datos en el historial para exportar.");
 
     const { jsPDF } = window.jspdf;
     const docPdf = new jsPDF();
@@ -464,10 +460,9 @@
       headStyles: { fillColor: [79, 70, 229] }
     });
 
-    docPdf.save(`Acta_Votacion_${Date.now()}.pdf`);
+    docPdf.save(`Acta_Asamblea_${Date.now()}.pdf`);
   }
 
-  // Cargar historial en tiempo real desde Firestore
   function listenToAllPolls() {
     const q = query(collection(db, "polls"));
     onSnapshot(q, async (snapshot) => {
@@ -475,8 +470,6 @@
       for (const docSnap of snapshot.docs) {
         const pData = { id: docSnap.id, ...docSnap.data() };
         
-        // Obtener el recuento de votos para cada punto
-        const votesSnap = await getDoc(doc(db, "votes", pData.id)); // o query
         const qVotes = query(collection(db, "votes"), where("poll_id", "==", pData.id));
         const vSnap = await getDocs(qVotes);
         
@@ -490,7 +483,6 @@
         pollsList.push(pData);
       }
 
-      // Ordenar por hora de creación/actualización
       pollsList.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
       pollHistory = pollsList;
       renderHistoryTable();
@@ -516,15 +508,6 @@
         const data = doc.data();
         votes[data.voter_id] = data.choice;
       });
-      
-      // Actualizar también el punto en el historial
-      const currentInHistory = pollHistory.find(h => h.id === id);
-      if (currentInHistory) {
-        const counts = { yes: 0, no: 0, abstain: 0 };
-        Object.values(votes).forEach(c => { if (counts[c] !== undefined) counts[c]++; });
-        currentInHistory.counts = counts;
-        renderHistoryTable();
-      }
       render();
     });
   }
