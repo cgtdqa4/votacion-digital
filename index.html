@@ -17,7 +17,7 @@
 </head>
 <body class="min-h-screen bg-slate-100 text-slate-800">
 
-<!-- Cabecera con las 3 pestañas para cambiar libremente en PC -->
+<!-- Cabecera de control (Solo visible en el PC para el Secretario/Proyección) -->
 <header id="header" class="bg-white border-b p-4 sticky top-0 z-50 shadow-sm">
   <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
     <h1 class="font-bold text-xl text-slate-900">Votación Digital</h1>
@@ -220,7 +220,7 @@
   let poll = { id: null, title: '', is_open: true, updated_at: null };
   let votes = {};
   let pollHistory = [];
-  let isDeleting = false; // Bandera para evitar que la escucha recargue los datos mientras se borran
+  let isDeleting = false;
   let unsubscribePoll = null;
   let unsubscribeVotes = null;
   let chart = null;
@@ -248,6 +248,15 @@
     if ($('tabSecretary')) $('tabSecretary').className = role === 'secretary' ? activeBtn : inactiveBtn;
     if ($('tabProjection')) $('tabProjection').className = role === 'projection' ? activeBtn : inactiveBtn;
     if ($('tabVoter')) $('tabVoter').className = role === 'voter' ? activeBtn : inactiveBtn;
+
+    // Si entra como votante (por ejemplo, al escanear el QR), ocultar por completo la barra superior de control
+    if (role === 'voter') {
+      $('header').classList.add('hidden');
+      $('connection').classList.add('hidden');
+    } else {
+      $('header').classList.remove('hidden');
+      $('connection').classList.remove('hidden');
+    }
 
     render();
   }
@@ -419,15 +428,13 @@
     }
   }
 
-  // BORRAR HISTORIAL AL INSTANTE (CON BLOQUEO DE SINCRONIZACIÓN TEMPORAL)
   window.clearHistory = async function() {
     if (pollHistory.length === 0) return alert("El historial ya está vacío.");
     if (!confirm("¿Seguro que deseas borrar todo el historial de votaciones de esta sesión?")) return;
 
     try {
-      isDeleting = true; // Bloquea la escucha automática momentáneamente
+      isDeleting = true;
 
-      // 1. Limpiar variables y pantalla de inmediato
       pollHistory = [];
       poll = { id: null, title: '', is_open: true, updated_at: null };
       votes = {};
@@ -440,13 +447,12 @@
       render();
       history.replaceState({}, '', location.pathname);
 
-      // 2. Borrar de Firebase en segundo plano
       const q = query(collection(db, "polls"));
       const snapshot = await getDocs(q);
       const promises = snapshot.docs.map(d => deleteDoc(d.ref));
       await Promise.all(promises);
 
-      isDeleting = false; // Reactiva la escucha normal
+      isDeleting = false;
     } catch (err) {
       isDeleting = false;
       alert("Error al borrar el historial: " + err.message);
@@ -511,7 +517,7 @@
   function listenToAllPolls() {
     const q = query(collection(db, "polls"));
     onSnapshot(q, async (snapshot) => {
-      if (isDeleting) return; // Si se está borrando, ignora la actualización para evitar bucles
+      if (isDeleting) return;
 
       const pollsList = [];
       for (const docSnap of snapshot.docs) {
